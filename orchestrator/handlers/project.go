@@ -4,10 +4,12 @@ import (
 	"log"
 	"os"
 
+	"github.com/adityadeshlahre/elbavol/orchestrator/k8s"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
+	"k8s.io/client-go/kubernetes"
 )
 
-func CreateProjectHandler(projectId string, senderToBroker *kafkaShared.KafkaClientWriter) {
+func CreateProjectHandler(projectId string, senderToBroker *kafkaShared.KafkaClientWriter, k8sClient *kubernetes.Clientset) {
 	// create /tmp/{projectId}.txt file for storing conversation history
 	file, err := os.Create("/tmp/" + projectId + ".txt")
 	if err != nil {
@@ -16,11 +18,32 @@ func CreateProjectHandler(projectId string, senderToBroker *kafkaShared.KafkaCli
 	}
 	file.Close()
 
-	// send message to broker via pubsub to create a pod for this projectId
-	err = senderToBroker.WriteMessage([]byte(projectId), []byte("Create Pod"))
+	// Create deployments for the project: global-broker (if not exists), project-controller, and project-serving
+	namespace := projectId
+
+	// Create global-broker deployment (only once, but for simplicity, create per project or check existence)
+	// For scalability, assume global-broker is pre-deployed or create it here
+	err = k8s.CreateGlobalBrokerDeployment(k8sClient, namespace)
 	if err != nil {
-		log.Printf("Error sending message to broker for project %s: %v", projectId, err)
+		log.Printf("Error creating global-broker deployment: %v", err)
+		// Continue, as it might already exist
 	}
+
+	// Create project-controller deployment
+	err = k8s.CreateProjectControllerDeployment(k8sClient, namespace, projectId)
+	if err != nil {
+		log.Printf("Error creating controller deployment for project %s: %v", projectId, err)
+		return
+	}
+
+	// Create project-serving deployment
+	err = k8s.CreateProjectServingDeployment(k8sClient, namespace, projectId)
+	if err != nil {
+		log.Printf("Error creating serving deployment for project %s: %v", projectId, err)
+		return
+	}
+
+	// The pods will handle Kafka communication internally
 }
 
 func GetProjectByIdHandler(projectId string) {

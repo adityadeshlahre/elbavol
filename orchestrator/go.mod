@@ -6,6 +6,7 @@ require (
 	github.com/adityadeshlahre/elbavol/shared v0.0.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
+	k8s.io/client-go v0.34.1
 )
 
 require (
@@ -53,7 +54,6 @@ require (
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
-	k8s.io/client-go v0.34.1
 )
 
 replace github.com/adityadeshlahre/elbavol/shared => ../shared
