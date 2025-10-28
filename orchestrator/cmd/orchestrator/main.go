@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/adityadeshlahre/elbavol/orchestrator/handlers"
-	k8s "github.com/adityadeshlahre/elbavol/orchestrator/k8s"
 	shared "github.com/adityadeshlahre/elbavol/shared"
+	k8sShared "github.com/adityadeshlahre/elbavol/shared/k8s"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
 	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -24,10 +24,10 @@ var K8sClient *kubernetes.Clientset
 func main() {
 	KafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
 	KafkaSenderClientToBackend = shared.NewWriter(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
-	KafkaReceiverClientFromBrocker = shared.NewReader(sharedTypes.BROCKER_TOPIC, sharedTypes.BROCKER_GROUP_ID)
-	KafkaSenderClientToBrocker = shared.NewWriter(sharedTypes.BROCKER_TOPIC, sharedTypes.BROCKER_GROUP_ID)
+	KafkaReceiverClientFromBrocker = shared.NewReader(sharedTypes.BROKER_TOPIC, sharedTypes.BROKER_GROUP_ID)
+	KafkaSenderClientToBrocker = shared.NewWriter(sharedTypes.BROKER_TOPIC, sharedTypes.BROKER_GROUP_ID)
 	KafkaClientBetweenPods = shared.NewClient(sharedTypes.POD_TOPIC, sharedTypes.POD_GROUP_ID)
-	K8sClient = k8s.CreateK8sClient()
+	K8sClient = k8sShared.CreateK8sClient()
 
 	// Start consumer from backend
 	go func() {
@@ -40,7 +40,7 @@ func main() {
 			projectId := string(msg.Key)
 			request := string(msg.Value)
 			if request == "Create Project Request" {
-				handlers.CreateProjectHandler(projectId, KafkaSenderClientToBrocker)
+				handlers.CreateProjectHandler(projectId, KafkaSenderClientToBrocker, K8sClient)
 				// Send response
 				err = KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte("Project created successfully"))
 				if err != nil {

@@ -11,11 +11,7 @@ import (
 
 var router *echo.Echo
 
-func InitProjectRoutes(e *echo.Echo) {
-	router = e
-}
-
-func RegisterProjectRoutes() {
+func ProjectRoutes() {
 	projectGroup := router.Group("/project")
 	{
 		projectGroup.POST("/create", CreateProjectHandler)
