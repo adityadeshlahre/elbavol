@@ -1,10 +1,26 @@
 package handlers
 
+import (
+	"log"
+	"os"
 
-func CreateProjectHandler(projectId string) {
-	// create projectId.txt file for storing conversation history
-	// send message to brocker via pubsub to create a pod for this projectId
+	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
+)
 
+func CreateProjectHandler(projectId string, senderToBroker *kafkaShared.KafkaClientWriter) {
+	// create /tmp/{projectId}.txt file for storing conversation history
+	file, err := os.Create("/tmp/" + projectId + ".txt")
+	if err != nil {
+		log.Printf("Error creating file for project %s: %v", projectId, err)
+		return
+	}
+	file.Close()
+
+	// send message to broker via pubsub to create a pod for this projectId
+	err = senderToBroker.WriteMessage([]byte(projectId), []byte("Create Pod"))
+	if err != nil {
+		log.Printf("Error sending message to broker for project %s: %v", projectId, err)
+	}
 }
 
 func GetProjectByIdHandler(projectId string) {

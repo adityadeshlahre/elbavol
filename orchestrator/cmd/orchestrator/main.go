@@ -1,6 +1,10 @@
 package orchestrator
 
 import (
+	"context"
+	"log"
+
+	"github.com/adityadeshlahre/elbavol/orchestrator/handlers"
 	k8s "github.com/adityadeshlahre/elbavol/orchestrator/k8s"
 	shared "github.com/adityadeshlahre/elbavol/shared"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
@@ -8,27 +12,48 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 )
 
-var kafkaReceiverClientFromBackend *kafkaShared.KafkaClientReader
-var kafkaSenderClientToBackend *kafkaShared.KafkaClientWriter
-var kafkaReceiverClientFromBrocker *kafkaShared.KafkaClientReader
-var kafkaSenderClientToBrocker *kafkaShared.KafkaClientWriter
+var KafkaReceiverClientFromBackend *kafkaShared.KafkaClientReader
+var KafkaSenderClientToBackend *kafkaShared.KafkaClientWriter
+var KafkaReceiverClientFromBrocker *kafkaShared.KafkaClientReader
+var KafkaSenderClientToBrocker *kafkaShared.KafkaClientWriter
 
-var kafkaClientBetweenPods *sharedTypes.KafkaClient
+var KafkaClientBetweenPods *sharedTypes.KafkaClient
 
-var k8sClient *kubernetes.Clientset
+var K8sClient *kubernetes.Clientset
 
 func main() {
-	kafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
-	kafkaSenderClientToBackend = shared.NewWriter(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
-	kafkaReceiverClientFromBrocker = shared.NewReader(sharedTypes.BROCKER_TOPIC, sharedTypes.BROCKER_GROUP_ID)
-	kafkaSenderClientToBrocker = shared.NewWriter(sharedTypes.BROCKER_TOPIC, sharedTypes.BROCKER_GROUP_ID)
-	kafkaClientBetweenPods = shared.NewClient(sharedTypes.POD_TOPIC, sharedTypes.POD_GROUP_ID)
-	k8sClient = k8s.CreateK8sClient()
+	KafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
+	KafkaSenderClientToBackend = shared.NewWriter(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
+	KafkaReceiverClientFromBrocker = shared.NewReader(sharedTypes.BROCKER_TOPIC, sharedTypes.BROCKER_GROUP_ID)
+	KafkaSenderClientToBrocker = shared.NewWriter(sharedTypes.BROCKER_TOPIC, sharedTypes.BROCKER_GROUP_ID)
+	KafkaClientBetweenPods = shared.NewClient(sharedTypes.POD_TOPIC, sharedTypes.POD_GROUP_ID)
+	K8sClient = k8s.CreateK8sClient()
 
-	// defer kafkaReceiverClientFromBackend.Close()
-	// defer kafkaSenderClientToBackend.Close()
-	// defer kafkaReceiverClientFromBrocker.Close()
-	// defer kafkaSenderClientToBrocker.Close()
-	// defer kafkaClientBetweenPods.Reader.Close()
-	// defer kafkaClientBetweenPods.Writer.Close()
+	// Start consumer from backend
+	go func() {
+		for {
+			msg, err := KafkaReceiverClientFromBackend.Reader.ReadMessage(context.Background())
+			if err != nil {
+				log.Printf("Error reading message from backend: %v", err)
+				continue
+			}
+			projectId := string(msg.Key)
+			request := string(msg.Value)
+			if request == "Create Project Request" {
+				handlers.CreateProjectHandler(projectId, KafkaSenderClientToBrocker)
+				// Send response
+				err = KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte("Project created successfully"))
+				if err != nil {
+					log.Printf("Error sending response to backend: %v", err)
+				}
+			}
+		}
+	}()
+
+	// defer KafkaReceiverClientFromBackend.Close()
+	// defer KafkaSenderClientToBackend.Close()
+	// defer KafkaReceiverClientFromBrocker.Close()
+	// defer KafkaSenderClientToBrocker.Close()
+	// defer KafkaClientBetweenPods.Reader.Close()
+	// defer KafkaClientBetweenPods.Writer.Close()
 }

@@ -4,7 +4,8 @@ go 1.25.1
 
 require (
 	github.com/adityadeshlahre/elbavol/shared v0.0.0
-	github.com/segmentio/kafka-go v0.4.49
+	k8s.io/api v0.34.1
+	k8s.io/apimachinery v0.34.1
 )
 
 require (
@@ -25,6 +26,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/segmentio/kafka-go v0.4.49 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
@@ -38,8 +40,6 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.34.1 // indirect
-	k8s.io/apimachinery v0.34.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b // indirect
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect
@@ -53,7 +53,6 @@ require (
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
 	k8s.io/client-go v0.34.1
 )
 

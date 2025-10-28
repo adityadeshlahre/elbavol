@@ -1,0 +1,50 @@
+package handler
+
+import (
+	"context"
+	"log"
+
+	"github.com/adityadeshlahre/elbavol/prime/cmd/prime"
+	"github.com/labstack/echo/v4"
+	gonanoid "github.com/matoous/go-nanoid/v2"
+)
+
+var router *echo.Echo
+
+func InitProjectRoutes(e *echo.Echo) {
+	router = e
+}
+
+func RegisterProjectRoutes() {
+	projectGroup := router.Group("/project")
+	{
+		projectGroup.POST("/create", CreateProjectHandler)
+	}
+}
+
+func CreateProjectHandler(c echo.Context) error {
+
+	id, err := gonanoid.New()
+	if err != nil {
+		return c.String(500, "Failed to generate ID")
+	}
+
+	// Send request
+	err = prime.KafkaSenderClientToOrchestrator.WriteMessage([]byte(id), []byte("Create Project Request"))
+	if err != nil {
+		return c.String(500, "Failed to send message")
+	}
+
+	// Await response
+	ctx := context.Background()
+	for {
+		msg, err := prime.KafkaReceiverClientFromOrchestrator.Reader.ReadMessage(ctx)
+		if err != nil {
+			log.Printf("Error reading message: %v", err)
+			return c.String(500, "Failed to read response")
+		}
+		if string(msg.Key) == id {
+			return c.String(200, string(msg.Value))
+		}
+	}
+}

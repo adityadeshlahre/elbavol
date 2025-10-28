@@ -1,6 +1,8 @@
 package kafka
 
 import (
+	"context"
+
 	"github.com/adityadeshlahre/elbavol/shared/types"
 	"github.com/segmentio/kafka-go"
 )
@@ -40,6 +42,10 @@ func NewKafkaClientWriter(kafkaURL string, topic string, groupID string) *KafkaC
 
 func (kcr *KafkaClientReader) Close() error {
 	return kcr.Reader.Close()
+}
+
+func (kcw *KafkaClientWriter) WriteMessage(key, value []byte) error {
+	return kcw.Writer.WriteMessages(context.Background(), kafka.Message{Key: key, Value: value})
 }
 
 func (kcw *KafkaClientWriter) Close() error {
