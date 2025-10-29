@@ -1,4 +1,4 @@
-package orchestrator
+package main
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	k8sShared "github.com/adityadeshlahre/elbavol/shared/k8s"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
 	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
-	kubernetes "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes"
 )
 
 var KafkaReceiverClientFromBackend *kafkaShared.KafkaClientReader
@@ -22,8 +22,8 @@ var KafkaClientBetweenPods *sharedTypes.KafkaClient
 var K8sClient *kubernetes.Clientset
 
 func main() {
-	KafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
-	KafkaSenderClientToBackend = shared.NewWriter(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
+	KafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PROJECT_TOPIC, sharedTypes.ORCHESTRATOR_GROUP_ID)
+	KafkaSenderClientToBackend = shared.NewWriter(sharedTypes.PROJECT_RESPONSE_TOPIC, sharedTypes.PROJECT_GROUP_ID)
 	KafkaReceiverClientFromBrocker = shared.NewReader(sharedTypes.BROKER_TOPIC, sharedTypes.BROKER_GROUP_ID)
 	KafkaSenderClientToBrocker = shared.NewWriter(sharedTypes.BROKER_TOPIC, sharedTypes.BROKER_GROUP_ID)
 	KafkaClientBetweenPods = shared.NewClient(sharedTypes.POD_TOPIC, sharedTypes.POD_GROUP_ID)
@@ -56,4 +56,7 @@ func main() {
 	// defer KafkaSenderClientToBrocker.Close()
 	// defer KafkaClientBetweenPods.Reader.Close()
 	// defer KafkaClientBetweenPods.Writer.Close()
+
+	// Block forever to keep the application running
+	select {}
 }

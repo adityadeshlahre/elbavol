@@ -24,7 +24,7 @@ func ProjectRoutes() {
 
 func CreateProjectHandler(c echo.Context) error {
 
-	id, err := gonanoid.New()
+	id, err := gonanoid.Generate("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 10)
 	if err != nil {
 		return c.String(500, "Failed to generate ID")
 	}

@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func CreateProjectHandler(projectId string, senderToBroker *kafkaShared.KafkaClientWriter, k8sClient *kubernetes.Clientset) {
+func CreateProjectHandler(projectId string, senderToServingPod *kafkaShared.KafkaClientWriter, k8sClient *kubernetes.Clientset) {
 	// create /tmp/{projectId}.txt file for storing conversation history
 	file, err := os.Create("/tmp/" + projectId + ".txt")
 	if err != nil {
@@ -18,32 +18,21 @@ func CreateProjectHandler(projectId string, senderToBroker *kafkaShared.KafkaCli
 	}
 	file.Close()
 
-	// Create deployments for the project: global-broker (if not exists), project-controller, and project-serving
-	namespace := projectId
+	namespace := "default"
 
-	// Create global-broker deployment (only once, but for simplicity, create per project or check existence)
-	// For scalability, assume global-broker is pre-deployed or create it here
-	err = k8s.CreateGlobalBrokerDeployment(k8sClient, namespace)
+	// Create development deployment
+	err = k8s.CreatePodDevelopmentDeployment(k8sClient, namespace, projectId)
 	if err != nil {
-		log.Printf("Error creating global-broker deployment: %v", err)
-		// Continue, as it might already exist
-	}
-
-	// Create project-controller deployment
-	err = k8s.CreateProjectControllerDeployment(k8sClient, namespace, projectId)
-	if err != nil {
-		log.Printf("Error creating controller deployment for project %s: %v", projectId, err)
+		log.Printf("Error creating development deployment for project %s: %v", projectId, err)
 		return
 	}
 
-	// Create project-serving deployment
-	err = k8s.CreateProjectServingDeployment(k8sClient, namespace, projectId)
+	// Send message to broker via pubsub that project is created
+	err = senderToServingPod.WriteMessage([]byte(projectId), []byte("Project Created "+projectId))
 	if err != nil {
-		log.Printf("Error creating serving deployment for project %s: %v", projectId, err)
+		log.Printf("Error sending project created message to broker for project %s: %v", projectId, err)
 		return
 	}
-
-	// The pods will handle Kafka communication internally
 }
 
 func GetProjectByIdHandler(projectId string) {
