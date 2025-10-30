@@ -1,6 +1,7 @@
-import { GROUP_ID } from "@elbavol/constants";
+import { GROUP_ID, TOPIC } from "@elbavol/constants";
 import "dotenv/config";
 import { Kafka } from "kafkajs";
+import { pushProjectInitializationToServingPod } from "./classes/project";
 
 console.log("Global POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
@@ -67,6 +68,50 @@ async function start() {
 	console.log("Control POD is running...");
 	await connectProducer();
 	await connectConsumer();
+
+	await consumer.subscribe({ topic: TOPIC.ORCHESTRATOR_TO_CONTROL, fromBeginning: true });
+
+	await consumer.run({
+		eachMessage: async ({ topic, partition, message }) => {
+			const projectId = message.key?.toString();
+			const value = message.value?.toString();
+
+			switch (value) {
+				case TOPIC.PROJECT_INITIALIZED:
+					if (projectId) {
+						console.log(`Initializing project ${projectId}`);
+						await pushProjectInitializationToServingPod(projectId, producer);
+					}
+					break;
+				default:
+					console.log(`Received unknown message: ${value} for project: ${projectId}`);
+					break;
+			}
+		},
+	});
+
+	await consumerBetweenPods.subscribe({ topic: TOPIC.BETWEEN_PODS, fromBeginning: true });
+
+	await consumerBetweenPods.run({
+		eachMessage: async ({ topic, partition, message }) => {
+			const projectId = message.key?.toString();
+			const value = message.value?.toString();
+			switch (value) {
+				case TOPIC.BETWEEN_PODS:
+					if (projectId) {
+						const callback = processing.get(projectId);
+						if (callback) {
+							callback({ success: true, payload: message.value?.toString() });
+							processing.delete(projectId);
+						}
+					}
+					break;
+				default:
+					console.log(`Received unknown message: ${value} for project: ${projectId}`);
+					break;
+			}
+		},
+	});
 
 	process.on("SIGINT", async () => {
 		console.log("Received SIGINT. Shutting down...");

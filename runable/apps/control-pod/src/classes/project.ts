@@ -15,7 +15,7 @@ export const pushProjectInitializationToServingPod = async (projectId: string, p
 
     try {
         await producer.send({
-            topic: GROUP_ID.BETWEEN_PODS,
+            topic: TOPIC.BETWEEN_PODS,
             messages: [
                 { key: projectId, value: JSON.stringify(TOPIC.PROJECT_INITIALIZED) }
             ]

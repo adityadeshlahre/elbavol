@@ -1,6 +1,7 @@
-import { GROUP_ID } from "@elbavol/constants";
+import { GROUP_ID, TOPIC } from "@elbavol/constants";
 import "dotenv/config";
 import { Kafka } from "kafkajs";
+import { fetchFilesAndConfirmProject } from "./classes/confirmation";
 
 console.log("Servering POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
@@ -18,7 +19,25 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({ groupId: GROUP_ID.SERVING_POD });
 
-export const consumerBetweenPods = kafka.consumer({ groupId: GROUP_ID.SERVING_POD });
+export const consumerBetweenPods = kafka.consumer({ groupId: GROUP_ID.BETWEEN_PODS });
+
+async function connectConsumerBetweenPods() {
+	try {
+		await consumerBetweenPods.connect();
+		console.log('Kafka Consumer Between Pods connected.');
+	} catch (error) {
+		console.error('Failed to connect Kafka Consumer Between Pods:', error);
+	}
+}
+
+async function disconnectConsumerBetweenPods() {
+	try {
+		await consumerBetweenPods.disconnect();
+		console.log('Kafka Consumer Between Pods disconnected.');
+	} catch (error) {
+		console.error('Failed to disconnect Kafka Consumer Between Pods:', error);
+	}
+}
 
 async function connectProducer() {
 	try {
@@ -62,9 +81,31 @@ async function start() {
 	console.log("Serving POD is running...");
 	await connectProducer();
 	await connectConsumer();
+	await connectConsumerBetweenPods();
+
+	await consumerBetweenPods.subscribe({ topic: TOPIC.BETWEEN_PODS, fromBeginning: true });
+
+	await consumerBetweenPods.run({
+		eachMessage: async ({ topic, partition, message }) => {
+			const projectId = message.key?.toString();
+			const value = message.value?.toString();
+			switch (value) {
+				case TOPIC.PROJECT_INITIALIZED:
+					if (projectId) {
+						console.log(`Fetching files for project ${projectId}`);
+						await fetchFilesAndConfirmProject(projectId, producer);
+					}
+					break;
+				default:
+					console.log(`Received unknown message: ${value} for project: ${projectId}`);
+					break;
+			}
+		},
+	});
 
 	process.on("SIGINT", async () => {
 		console.log("Received SIGINT. Shutting down...");
+		await disconnectConsumerBetweenPods();
 		await disconnectConsumer();
 		await disconnectProducer();
 		process.exit(0);
@@ -72,6 +113,7 @@ async function start() {
 
 	process.on("SIGTERM", async () => {
 		console.log("Received SIGTERM. Shutting down...");
+		await disconnectConsumerBetweenPods();
 		await disconnectConsumer();
 		await disconnectProducer();
 		process.exit(0);

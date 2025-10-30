@@ -1,33 +1,46 @@
 import { TOPIC } from "@elbavol/constants"
 import { getObject, listObjects } from "@elbavol/r2"
 import type { Producer } from "kafkajs"
+import fs from "fs"
+import path from "path"
 
-export const pushProjectCreatedToQueue = async (projectId: string, producer: Producer) => {
+export const fetchFilesAndConfirmProject = async (projectId: string, producer: Producer) => {
     const { $metadata, Contents } = await listObjects({
         Bucket: projectId,
-        MaxKeys: 1,
     })
 
-    await getObject({
-        Bucket: projectId,
-        Key: Contents && Contents.length > 0 && Contents[0] && Contents[0].Key ? Contents[0].Key : "",
-    }).then(() => { }).catch(() => { }).finally(() => { })
-
-
-    if ($metadata.httpStatusCode !== 200) {
-        console.error(`Failed to access bucket for project ${projectId}`)
+    if ($metadata.httpStatusCode !== 200 || !Contents) {
+        console.error(`Failed to list objects for project ${projectId}`)
         return false
+    }
+
+    const dir = path.join("/app/shared", projectId);
+    fs.mkdirSync(dir, { recursive: true });
+
+    for (const obj of Contents) {
+        if (obj.Key) {
+            const { Body } = await getObject({
+                Bucket: projectId,
+                Key: obj.Key,
+            });
+            const filePath = path.join(dir, obj.Key);
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+            const buffer = Buffer.from(await Body?.transformToByteArray() || new Uint8Array());
+            fs.writeFileSync(filePath, buffer);
+        }
     }
 
     try {
         await producer.send({
-            topic: TOPIC.PROJECT_CREATED,
+            topic: TOPIC.SERVING_TO_ORCHESTRATOR,
             messages: [
-                { key: projectId, value: JSON.stringify({ projectId }) }
+                { key: projectId, value: TOPIC.PROJECT_CREATED }
             ]
         })
     } catch (error) {
         console.error(`Failed to produce PROJECT_CREATED for project ${projectId}:`, error)
         return false
     }
+
+    return true
 }
