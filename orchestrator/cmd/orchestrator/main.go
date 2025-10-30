@@ -45,10 +45,9 @@ func main() {
 			request := string(msg.Value)
 
 			switch request {
-			case "Create Project Request":
-				handlers.CreateProjectHandler(projectId, KafkaSenderClientToControl, K8sClient)
-				// Send response
-				err = KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte("Project created successfully"))
+			case sharedTypes.CREATE_PROJECT:
+				handlers.CreateProjectHandler(projectId, K8sClient)
+				err = KafkaSenderClientToControl.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_INITIALIZED))
 				if err != nil {
 					log.Printf("Error sending response to backend: %v", err)
 				}
@@ -67,7 +66,16 @@ func main() {
 			}
 			projectId := string(msg.Key)
 			response := string(msg.Value)
-			log.Printf("Received message from serving pod for project %s: %s", projectId, response)
+
+			switch response {
+			case sharedTypes.PROJECT_CREATED:
+				err = KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte("Project Created successfully"))
+				if err != nil {
+					log.Printf("Error sending project created confirmation to backend: %v", err)
+				}
+			default:
+				log.Printf("Unknown request type: %s", response)
+			}
 		}
 	}()
 

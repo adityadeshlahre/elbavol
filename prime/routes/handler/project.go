@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/adityadeshlahre/elbavol/prime/clients"
+	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
 	"github.com/labstack/echo/v4"
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
@@ -29,8 +30,7 @@ func CreateProjectHandler(c echo.Context) error {
 		return c.String(500, "Failed to generate ID")
 	}
 
-	// Send request
-	err = clients.KafkaSenderClientToOrchestrator.WriteMessage([]byte(id), []byte("Create Project Request"))
+	err = clients.KafkaSenderClientToOrchestrator.WriteMessage([]byte(id), []byte(sharedTypes.CREATE_PROJECT))
 	if err != nil {
 		return c.String(500, "Failed to send message")
 	}
@@ -43,8 +43,11 @@ func CreateProjectHandler(c echo.Context) error {
 			log.Printf("Error reading message: %v", err)
 			return c.String(500, "Failed to read response")
 		}
-		if string(msg.Key) == id {
-			return c.String(200, string(msg.Value))
+		projectId := string(msg.Key)
+		response := string(msg.Value)
+
+		if projectId == id && response == sharedTypes.PROJECT_CREATED {
+			return c.String(200, "Project created with ID: "+projectId)
 		}
 	}
 }

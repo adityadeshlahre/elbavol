@@ -6,4 +6,5 @@ export const TOPIC = {
 export const GROUP_ID = {
     SERVING_POD: "SERVING_POD",
     CONTROL_POD: "CONTROL_POD",
+    BETWEEN_PODS: "BETWEEN_PODS",
 }

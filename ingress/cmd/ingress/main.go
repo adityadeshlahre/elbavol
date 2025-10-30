@@ -43,4 +43,6 @@ func main() {
 			log.Printf("Mapped projectId %s to service %s", projectId, serviceName)
 		}
 	}()
+
+	select {}
 }

@@ -16,7 +16,9 @@ const kafka = new Kafka(kafkaConfig);
 
 export const producer = kafka.producer();
 
-export const consumer = kafka.consumer({ groupId: GROUP_ID.CONTROL_POD });
+export const consumer = kafka.consumer({ groupId: GROUP_ID.SERVING_POD });
+
+export const consumerBetweenPods = kafka.consumer({ groupId: GROUP_ID.SERVING_POD });
 
 async function connectProducer() {
 	try {
