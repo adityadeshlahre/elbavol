@@ -14,18 +14,22 @@ import (
 
 var KafkaReceiverClientFromBackend *kafkaShared.KafkaClientReader
 var KafkaSenderClientToBackend *kafkaShared.KafkaClientWriter
-var KafkaReceiverClientFromBrocker *kafkaShared.KafkaClientReader
-var KafkaSenderClientToBrocker *kafkaShared.KafkaClientWriter
+var KafkaReceiverClientFromControl *kafkaShared.KafkaClientReader
+var KafkaSenderClientToControl *kafkaShared.KafkaClientWriter
+var KafkaReceiverClientFromServing *kafkaShared.KafkaClientReader
+var KafkaSenderClientToServing *kafkaShared.KafkaClientWriter
 
 var KafkaClientBetweenPods *sharedTypes.KafkaClient
 
 var K8sClient *kubernetes.Clientset
 
 func main() {
-	KafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PROJECT_TOPIC, sharedTypes.ORCHESTRATOR_GROUP_ID)
+	KafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PROJECT_TOPIC, sharedTypes.PROJECT_GROUP_ID)
 	KafkaSenderClientToBackend = shared.NewWriter(sharedTypes.PROJECT_RESPONSE_TOPIC, sharedTypes.PROJECT_GROUP_ID)
-	KafkaReceiverClientFromBrocker = shared.NewReader(sharedTypes.BROKER_TOPIC, sharedTypes.BROKER_GROUP_ID)
-	KafkaSenderClientToBrocker = shared.NewWriter(sharedTypes.BROKER_TOPIC, sharedTypes.BROKER_GROUP_ID)
+	KafkaReceiverClientFromControl = shared.NewReader(sharedTypes.CONTROL_TO_ORCHESTRATOR, sharedTypes.ORCHESTRATOR_GROUP_ID)
+	KafkaSenderClientToControl = shared.NewWriter(sharedTypes.ORCHESTRATOR_TO_CONTROL, sharedTypes.ORCHESTRATOR_GROUP_ID)
+	KafkaReceiverClientFromServing = shared.NewReader(sharedTypes.SERVING_TO_ORCHESTRATOR, sharedTypes.ORCHESTRATOR_GROUP_ID)
+	KafkaSenderClientToServing = shared.NewWriter(sharedTypes.ORCHESTRATOR_TO_SERVING, sharedTypes.ORCHESTRATOR_GROUP_ID)
 	KafkaClientBetweenPods = shared.NewClient(sharedTypes.POD_TOPIC, sharedTypes.POD_GROUP_ID)
 	K8sClient = k8sShared.CreateK8sClient()
 
@@ -39,21 +43,40 @@ func main() {
 			}
 			projectId := string(msg.Key)
 			request := string(msg.Value)
-			if request == "Create Project Request" {
-				handlers.CreateProjectHandler(projectId, KafkaSenderClientToBrocker, K8sClient)
+
+			switch request {
+			case "Create Project Request":
+				handlers.CreateProjectHandler(projectId, KafkaSenderClientToControl, K8sClient)
 				// Send response
 				err = KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte("Project created successfully"))
 				if err != nil {
 					log.Printf("Error sending response to backend: %v", err)
 				}
+			default:
+				log.Printf("Unknown request type: %s", request)
 			}
+		}
+	}()
+
+	go func() {
+		for {
+			msg, err := KafkaReceiverClientFromServing.Reader.ReadMessage(context.Background())
+			if err != nil {
+				log.Printf("Error reading message from serving pod: %v", err)
+				continue
+			}
+			projectId := string(msg.Key)
+			response := string(msg.Value)
+			log.Printf("Received message from serving pod for project %s: %s", projectId, response)
 		}
 	}()
 
 	// defer KafkaReceiverClientFromBackend.Close()
 	// defer KafkaSenderClientToBackend.Close()
-	// defer KafkaReceiverClientFromBrocker.Close()
-	// defer KafkaSenderClientToBrocker.Close()
+	// defer KafkaReceiverClientFromControl.Close()
+	// defer KafkaSenderClientToControl.Close()
+	// defer KafkaReceiverClientFromServing.Close()
+	// defer KafkaSenderClientToServing.Close()
 	// defer KafkaClientBetweenPods.Reader.Close()
 	// defer KafkaClientBetweenPods.Writer.Close()
 

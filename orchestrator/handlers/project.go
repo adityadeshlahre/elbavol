@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func CreateProjectHandler(projectId string, senderToServingPod *kafkaShared.KafkaClientWriter, k8sClient *kubernetes.Clientset) {
+func CreateProjectHandler(projectId string, senderToControlPod *kafkaShared.KafkaClientWriter, k8sClient *kubernetes.Clientset) {
 	// create /tmp/{projectId}.txt file for storing conversation history
 	file, err := os.Create("/tmp/" + projectId + ".txt")
 	if err != nil {
@@ -28,11 +28,14 @@ func CreateProjectHandler(projectId string, senderToServingPod *kafkaShared.Kafk
 	}
 
 	// Send message to broker via pubsub that project is created
-	err = senderToServingPod.WriteMessage([]byte(projectId), []byte("Project Created "+projectId))
+	err = senderToControlPod.WriteMessage([]byte(projectId), []byte("Project Created "+projectId))
 	if err != nil {
 		log.Printf("Error sending project created message to broker for project %s: %v", projectId, err)
 		return
 	}
+
+	// await confirmation from serving pod that it has received the message
+
 }
 
 func GetProjectByIdHandler(projectId string) {
