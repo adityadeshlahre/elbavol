@@ -6,7 +6,6 @@
     ".": "./index.ts",
     "./*": "./*.ts"
   },
-
   "devDependencies": {
     "@types/bun": "latest"
   },

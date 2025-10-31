@@ -1,12 +1,18 @@
-import { GROUP_ID, TOPIC } from "@elbavol/constants";
+import { GROUP_ID, MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import "dotenv/config";
 import { Kafka } from "kafkajs";
 import { pushProjectInitializationToServingPod } from "./classes/project";
+import { listObjects, getObject } from "@elbavol/r2";
+import fs from "fs";
+import path from "path";
 
 console.log("Global POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
 	CORS_ORIGIN: process.env.CORS_ORIGIN,
 });
+
+export const projectId = process.env.PROJECT_ID || "";
+export const bucketName = process.env.BUCKET_NAME || "";
 
 export const processing = new Map<
 	string,
@@ -64,10 +70,93 @@ async function disconnectConsumer() {
 	}
 }
 
+async function pullTemplateFromR2RenameItAsProject() {
+	try {
+		const { Contents } = await listObjects({
+			Bucket: bucketName,
+			Prefix: "template/",
+		});
+
+		if (!Contents || Contents.length === 0) {
+			throw new Error("No template files found in bucket");
+		}
+
+		const sharedDir = "/app/shared";
+		const projectDir = path.join(sharedDir, projectId);
+
+		if (!fs.existsSync(sharedDir)) {
+			fs.mkdirSync(sharedDir, { recursive: true });
+		}
+
+		fs.mkdirSync(projectDir, { recursive: true });
+
+		for (const obj of Contents) {
+			if (!obj.Key) continue;
+
+			if (obj.Key === "template/") continue;
+
+			const relativePath = obj.Key.replace("template/", "");
+
+			try {
+				const { Body } = await getObject({
+					Bucket: bucketName,
+					Key: obj.Key,
+				});
+
+				const filePath = path.join(projectDir, relativePath);
+
+				const fileDir = path.dirname(filePath);
+				if (!fs.existsSync(fileDir)) {
+					fs.mkdirSync(fileDir, { recursive: true });
+				}
+
+				const buffer = Buffer.from(
+					(await Body?.transformToByteArray()) || new Uint8Array(),
+				);
+				fs.writeFileSync(filePath, buffer);
+			} catch (error) {
+				console.error(`Failed to download ${obj.Key}:`, error);
+			}
+		}
+
+		const newObject = {
+			projectId,
+			bucketName,
+			timestamp: new Date().toISOString(),
+			filesCount: Contents.length,
+		};
+
+		await producer.send({
+			topic: TOPIC.BETWEEN_PODS,
+			messages: [{ key: projectId, value: JSON.stringify(newObject) }],
+		});
+
+		return {
+			success: true,
+			message: `Successfully pulled template code for project ${projectId}`,
+			projectId,
+			bucketName,
+			filesDownloaded: Contents.length,
+			newObject,
+		};
+	} catch (error) {
+		console.error("Error in createNewObjectAndCreateProject:", error);
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		return {
+			success: false,
+			message: `Failed to pull code for project ${projectId}: ${errorMessage}`,
+			projectId,
+			bucketName,
+			error: errorMessage,
+		};
+	}
+}
+
 async function start() {
 	console.log("Control POD is running...");
 	await connectProducer();
 	await connectConsumer();
+	await pullTemplateFromR2RenameItAsProject();
 
 	await consumer.subscribe({
 		topic: TOPIC.ORCHESTRATOR_TO_CONTROL,
@@ -75,12 +164,12 @@ async function start() {
 	});
 
 	await consumer.run({
-		eachMessage: async ({ topic, partition, message }) => {
+		eachMessage: async ({ message }) => {
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
 
 			switch (value) {
-				case TOPIC.PROJECT_INITIALIZED:
+				case MESSAGE_KEYS.PROJECT_INITIALIZED:
 					if (projectId) {
 						console.log(`Initializing project ${projectId}`);
 						await pushProjectInitializationToServingPod(projectId, producer);
@@ -101,7 +190,7 @@ async function start() {
 	});
 
 	await consumerBetweenPods.run({
-		eachMessage: async ({ topic, partition, message }) => {
+		eachMessage: async ({ message }) => {
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
 			switch (value) {
@@ -142,4 +231,3 @@ start().catch((error) => {
 	console.error("Error starting Control POD:", error);
 	process.exit(1);
 });
-
