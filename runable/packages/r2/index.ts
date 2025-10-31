@@ -1,5 +1,6 @@
 import {
-    S3Client, ListBucketsCommand,
+    S3Client,
+    ListBucketsCommand,
     ListObjectsV2Command,
     GetObjectCommand,
     PutObjectCommand,
@@ -20,7 +21,7 @@ import {
     type DeleteBucketCommandOutput,
     type CreateBucketCommandInput,
     type CreateBucketCommandOutput,
-} from "@aws-sdk/client-s3"
+} from "@aws-sdk/client-s3";
 
 export const S3 = new S3Client({
     region: "auto",
@@ -31,45 +32,58 @@ export const S3 = new S3Client({
     },
 });
 
-export async function createBucket(params: CreateBucketCommandInput): Promise<CreateBucketCommandOutput> {
+export async function createBucket(
+    params: CreateBucketCommandInput,
+): Promise<CreateBucketCommandOutput> {
     const command = new CreateBucketCommand(params);
     const response = await S3.send(command);
     return response;
 }
 
-export async function deleteBucket(params: DeleteBucketCommandInput): Promise<DeleteBucketCommandOutput> {
+export async function deleteBucket(
+    params: DeleteBucketCommandInput,
+): Promise<DeleteBucketCommandOutput> {
     const command = new DeleteBucketCommand(params);
     const response = await S3.send(command);
     return response;
 }
 
-export async function listBuckets(params: ListBucketsCommandInput = {}): Promise<ListBucketsCommandOutput> {
+export async function listBuckets(
+    params: ListBucketsCommandInput = {},
+): Promise<ListBucketsCommandOutput> {
     const command = new ListBucketsCommand(params);
     const response = await S3.send(command);
     return response;
 }
 
-export async function listObjects(params: ListObjectsV2CommandInput): Promise<ListObjectsV2CommandOutput> {
+export async function listObjects(
+    params: ListObjectsV2CommandInput,
+): Promise<ListObjectsV2CommandOutput> {
     const command = new ListObjectsV2Command(params);
     const response = await S3.send(command);
     return response;
 }
 
-export async function getObject(params: GetObjectCommandInput): Promise<GetObjectCommandOutput> {
+export async function getObject(
+    params: GetObjectCommandInput,
+): Promise<GetObjectCommandOutput> {
     const command = new GetObjectCommand(params);
     const response = await S3.send(command);
     return response;
 }
 
-export async function putObject(params: PutObjectCommandInput): Promise<PutObjectCommandOutput> {
+export async function putObject(
+    params: PutObjectCommandInput,
+): Promise<PutObjectCommandOutput> {
     const command = new PutObjectCommand(params);
     const response = await S3.send(command);
     return response;
 }
 
-export async function deleteObject(params: DeleteObjectCommandInput): Promise<DeleteObjectCommandOutput> {
+export async function deleteObject(
+    params: DeleteObjectCommandInput,
+): Promise<DeleteObjectCommandOutput> {
     const command = new DeleteObjectCommand(params);
     const response = await S3.send(command);
     return response;
 }
-

@@ -26,10 +26,22 @@ var K8sClient *kubernetes.Clientset
 func main() {
 	KafkaReceiverClientFromBackend = shared.NewReader(sharedTypes.PRIME_TO_ORCHESTRATOR, sharedTypes.PROJECT_GROUP_ID)
 	KafkaSenderClientToBackend = shared.NewWriter(sharedTypes.ORCHESTRATOR_TO_PRIME, sharedTypes.PROJECT_GROUP_ID)
-	KafkaReceiverClientFromControl = shared.NewReader(sharedTypes.CONTROL_TO_ORCHESTRATOR, sharedTypes.ORCHESTRATOR_GROUP_ID)
-	KafkaSenderClientToControl = shared.NewWriter(sharedTypes.ORCHESTRATOR_TO_CONTROL, sharedTypes.ORCHESTRATOR_GROUP_ID)
-	KafkaReceiverClientFromServing = shared.NewReader(sharedTypes.SERVING_TO_ORCHESTRATOR, sharedTypes.ORCHESTRATOR_GROUP_ID)
-	KafkaSenderClientToServing = shared.NewWriter(sharedTypes.ORCHESTRATOR_TO_SERVING, sharedTypes.ORCHESTRATOR_GROUP_ID)
+	KafkaReceiverClientFromControl = shared.NewReader(
+		sharedTypes.CONTROL_TO_ORCHESTRATOR,
+		sharedTypes.ORCHESTRATOR_GROUP_ID,
+	)
+	KafkaSenderClientToControl = shared.NewWriter(
+		sharedTypes.ORCHESTRATOR_TO_CONTROL,
+		sharedTypes.ORCHESTRATOR_GROUP_ID,
+	)
+	KafkaReceiverClientFromServing = shared.NewReader(
+		sharedTypes.SERVING_TO_ORCHESTRATOR,
+		sharedTypes.ORCHESTRATOR_GROUP_ID,
+	)
+	KafkaSenderClientToServing = shared.NewWriter(
+		sharedTypes.ORCHESTRATOR_TO_SERVING,
+		sharedTypes.ORCHESTRATOR_GROUP_ID,
+	)
 	KafkaClientBetweenPods = shared.NewClient(sharedTypes.POD_TOPIC, sharedTypes.POD_GROUP_ID)
 	K8sClient = k8sShared.CreateK8sClient()
 
@@ -46,7 +58,13 @@ func main() {
 
 			switch request {
 			case sharedTypes.CREATE_PROJECT:
-				handlers.CreateProjectHandler(projectId, K8sClient, KafkaSenderClientToControl, KafkaReceiverClientFromServing, KafkaSenderClientToBackend)
+				handlers.CreateProjectHandler(
+					projectId,
+					K8sClient,
+					KafkaSenderClientToControl,
+					KafkaReceiverClientFromServing,
+					KafkaSenderClientToBackend,
+				)
 			default:
 				log.Printf("Unknown request type: %s", request)
 			}

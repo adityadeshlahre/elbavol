@@ -10,7 +10,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreatePod(clientSet *kubernetes.Clientset, namespace string, name string, image string, labels map[string]string) error {
+func CreatePod(
+	clientSet *kubernetes.Clientset,
+	namespace string,
+	name string,
+	image string,
+	labels map[string]string,
+) error {
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

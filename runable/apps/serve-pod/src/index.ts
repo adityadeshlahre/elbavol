@@ -11,7 +11,7 @@ console.log("Servering POD started with env:", {
 const kafkaConfig = {
 	clientId: "serve-pod",
 	brokers: (process.env.KAFKA_BROKERS || "localhost:9092").split(","),
-}
+};
 
 const kafka = new Kafka(kafkaConfig);
 
@@ -19,63 +19,63 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({ groupId: GROUP_ID.SERVING_POD });
 
-export const consumerBetweenPods = kafka.consumer({ groupId: GROUP_ID.BETWEEN_PODS });
+export const consumerBetweenPods = kafka.consumer({
+	groupId: GROUP_ID.BETWEEN_PODS,
+});
 
 async function connectConsumerBetweenPods() {
 	try {
 		await consumerBetweenPods.connect();
-		console.log('Kafka Consumer Between Pods connected.');
+		console.log("Kafka Consumer Between Pods connected.");
 	} catch (error) {
-		console.error('Failed to connect Kafka Consumer Between Pods:', error);
+		console.error("Failed to connect Kafka Consumer Between Pods:", error);
 	}
 }
 
 async function disconnectConsumerBetweenPods() {
 	try {
 		await consumerBetweenPods.disconnect();
-		console.log('Kafka Consumer Between Pods disconnected.');
+		console.log("Kafka Consumer Between Pods disconnected.");
 	} catch (error) {
-		console.error('Failed to disconnect Kafka Consumer Between Pods:', error);
+		console.error("Failed to disconnect Kafka Consumer Between Pods:", error);
 	}
 }
 
 async function connectProducer() {
 	try {
 		await producer.connect();
-		console.log('Kafka Producer connected.');
+		console.log("Kafka Producer connected.");
 	} catch (error) {
-		console.error('Failed to connect Kafka Producer:', error);
+		console.error("Failed to connect Kafka Producer:", error);
 	}
 }
 
 async function connectConsumer() {
 	try {
 		await consumer.connect();
-		console.log('Kafka Consumer connected.');
+		console.log("Kafka Consumer connected.");
 	} catch (error) {
-		console.error('Failed to connect Kafka Consumer:', error);
+		console.error("Failed to connect Kafka Consumer:", error);
 	}
 }
 
 async function disconnectProducer() {
 	try {
 		await producer.disconnect();
-		console.log('Kafka Producer disconnected.');
+		console.log("Kafka Producer disconnected.");
 	} catch (error) {
-		console.error('Failed to disconnect Kafka Producer:', error);
+		console.error("Failed to disconnect Kafka Producer:", error);
 	}
 }
 
 async function disconnectConsumer() {
 	try {
 		await consumer.disconnect();
-		console.log('Kafka Consumer disconnected.');
+		console.log("Kafka Consumer disconnected.");
 	} catch (error) {
-		console.error('Failed to disconnect Kafka Consumer:', error);
+		console.error("Failed to disconnect Kafka Consumer:", error);
 	}
 }
-
-
 
 async function start() {
 	console.log("Serving POD is running...");
@@ -83,7 +83,10 @@ async function start() {
 	await connectConsumer();
 	await connectConsumerBetweenPods();
 
-	await consumerBetweenPods.subscribe({ topic: TOPIC.BETWEEN_PODS, fromBeginning: true });
+	await consumerBetweenPods.subscribe({
+		topic: TOPIC.BETWEEN_PODS,
+		fromBeginning: true,
+	});
 
 	await consumerBetweenPods.run({
 		eachMessage: async ({ topic, partition, message }) => {
@@ -97,7 +100,9 @@ async function start() {
 					}
 					break;
 				default:
-					console.log(`Received unknown message: ${value} for project: ${projectId}`);
+					console.log(
+						`Received unknown message: ${value} for project: ${projectId}`,
+					);
 					break;
 			}
 		},
@@ -124,3 +129,4 @@ start().catch((error) => {
 	console.error("Error starting Serving POD:", error);
 	process.exit(1);
 });
+

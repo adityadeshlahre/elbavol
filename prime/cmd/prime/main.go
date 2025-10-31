@@ -9,8 +9,14 @@ import (
 
 func main() {
 
-	clients.KafkaReceiverClientFromOrchestrator = shared.NewReader(sharedTypes.ORCHESTRATOR_TO_PRIME, sharedTypes.PROJECT_GROUP_ID)
-	clients.KafkaSenderClientToOrchestrator = shared.NewWriter(sharedTypes.PRIME_TO_ORCHESTRATOR, sharedTypes.PROJECT_GROUP_ID)
+	clients.KafkaReceiverClientFromOrchestrator = shared.NewReader(
+		sharedTypes.ORCHESTRATOR_TO_PRIME,
+		sharedTypes.PROJECT_GROUP_ID,
+	)
+	clients.KafkaSenderClientToOrchestrator = shared.NewWriter(
+		sharedTypes.PRIME_TO_ORCHESTRATOR,
+		sharedTypes.PROJECT_GROUP_ID,
+	)
 	// defer clients.KafkaReceiverClientFromOrchestrator.Close()
 	// defer clients.KafkaSenderClientToOrchestrator.Close()
 

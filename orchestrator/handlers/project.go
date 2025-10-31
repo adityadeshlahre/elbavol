@@ -11,7 +11,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func CreateProjectHandler(projectId string, k8sClient *kubernetes.Clientset, senderToControl *kafkaShared.KafkaClientWriter, receiverFromServing *kafkaShared.KafkaClientReader, senderToBackend *kafkaShared.KafkaClientWriter) {
+func CreateProjectHandler(
+	projectId string,
+	k8sClient *kubernetes.Clientset,
+	senderToControl *kafkaShared.KafkaClientWriter,
+	receiverFromServing *kafkaShared.KafkaClientReader,
+	senderToBackend *kafkaShared.KafkaClientWriter,
+) {
 	// create /tmp/{projectId}.txt file for storing conversation history
 	file, err := os.Create("/tmp/" + projectId + ".txt")
 	if err != nil {
