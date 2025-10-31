@@ -1,25 +1,25 @@
 {
-  "name": "serve-pod",
-  "main": "src/index.ts",
-  "type": "module",
-  "scripts": {
-    "build": "tsdown",
-    "check-types": "tsc -b",
-    "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run dist/index.js"
-  },
-  "dependencies": {
-    "dotenv": "^17.2.3",
-    "kafkajs": "^2.2.4",
-    "zod": "^4.1.12",
-    "@elbavol/r2": "workspace:*",
-    "@elbavol/types": "workspace:*",
-    "@elbavol/constants": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/bun": "^1.3.1",
-    "tsdown": "^0.15.11",
-    "typescript": "^5.9.3"
-  }
+	"name": "serve-pod",
+	"main": "src/index.ts",
+	"type": "module",
+	"scripts": {
+		"build": "tsdown",
+		"check-types": "tsc -b",
+		"compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
+		"dev": "bun run --hot src/index.ts",
+		"start": "bun run dist/index.js"
+	},
+	"dependencies": {
+		"dotenv": "^17.2.3",
+		"kafkajs": "^2.2.4",
+		"zod": "^4.1.12",
+		"@elbavol/r2": "workspace:*",
+		"@elbavol/types": "workspace:*",
+		"@elbavol/constants": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.1",
+		"tsdown": "^0.15.11",
+		"typescript": "^5.9.3"
+	}
 }

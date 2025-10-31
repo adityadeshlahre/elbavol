@@ -9,6 +9,8 @@ import (
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
 	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
 	"k8s.io/client-go/kubernetes"
+	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/utils/ptr"
 )
 
 var KafkaReceiverClientFromOrchestrator *kafkaShared.KafkaClientReader

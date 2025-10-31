@@ -1,12 +1,18 @@
-import { GROUP_ID, TOPIC } from "@elbavol/constants";
+import { GROUP_ID, MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import "dotenv/config";
 import { Kafka } from "kafkajs";
-import { fetchFilesAndConfirmProject } from "./classes/confirmation";
+import { fetchFilesAndConfirmProject } from "./classes/confirm";
+import { serveTheProject } from "./classes/serve";
 
 console.log("Servering POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
 	CORS_ORIGIN: process.env.CORS_ORIGIN,
 });
+
+export let projectRunning = false;
+
+export const projectId = process.env.PROJECT_ID || "";
+export const bucketName = process.env.BUCKET_NAME || "";
 
 const kafkaConfig = {
 	clientId: "serve-pod",
@@ -89,14 +95,21 @@ async function start() {
 	});
 
 	await consumerBetweenPods.run({
-		eachMessage: async ({ topic, partition, message }) => {
+		eachMessage: async ({ message }) => {
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
 			switch (value) {
-				case TOPIC.PROJECT_INITIALIZED:
+				case MESSAGE_KEYS.PROJECT_INITIALIZED:
 					if (projectId) {
 						console.log(`Fetching files for project ${projectId}`);
 						await fetchFilesAndConfirmProject(projectId, producer);
+					}
+					break;
+				case MESSAGE_KEYS.PROJECT_RUN:
+					if (projectId) {
+						await serveTheProject(projectId, producer);
+						console.log(`Project ${projectId} is now running.`);
+						projectRunning = true;
 					}
 					break;
 				default:
@@ -129,4 +142,3 @@ start().catch((error) => {
 	console.error("Error starting Serving POD:", error);
 	process.exit(1);
 });
-
