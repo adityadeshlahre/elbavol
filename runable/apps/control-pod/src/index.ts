@@ -5,6 +5,7 @@ import { pushProjectInitializationToServingPod } from "./classes/project";
 import { listObjects, getObject } from "@elbavol/r2";
 import fs from "fs";
 import path from "path";
+import { buildProjectAndNotifyToRun } from "./agent/tool/code/buildSource";
 
 console.log("Global POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
@@ -173,6 +174,14 @@ async function start() {
 					if (projectId) {
 						console.log(`Initializing project ${projectId}`);
 						await pushProjectInitializationToServingPod(projectId, producer);
+					}
+					break;
+				case MESSAGE_KEYS.PROJECT_BUILD:
+					if (projectId) {
+						const s = await buildProjectAndNotifyToRun(projectId, producer);
+						s
+							? console.log(`Project ${projectId} built successfully.`)
+							: console.log(`Project ${projectId} build failed.`);
 					}
 					break;
 				default:

@@ -1,5 +1,5 @@
 export const SYSTEM_PROMPTS = {
-  INITPROMPT: `
+  PROJECT_INITIALIZE_PROMPT: `
 You are an expert AI developer specializing in React. Your task is to build a complete React application based on the user's prompt.
 
 You have access to a sandbox environment and a set of tools to interact with it:

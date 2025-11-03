@@ -14,6 +14,9 @@
 		"@elbavol/r2": "workspace:*",
 		"@elbavol/types": "workspace:*",
 		"@langchain/google-genai": "^1.0.0",
+		"@langchain/core": "^1.0.2",
+		"@langchain/langgraph": "^1.0.1",
+		"langchain": "^1.0.2",
 		"dotenv": "^17.2.3",
 		"kafkajs": "^2.2.4",
 		"zod": "^4.1.12"

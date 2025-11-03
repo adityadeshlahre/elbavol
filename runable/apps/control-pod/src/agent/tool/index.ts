@@ -1,3 +1,15 @@
 export { pushFilesToR2 } from "./r2PullPush/push";
 export { validateBuild } from "./code/validateBuild";
 export { buildSource } from "./code/buildSource";
+export { addAndRemoveDependency } from "./dry/addAndRemoveDependency";
+export { checkMissingPackage } from "./dry/checkMissingPackage";
+export { createFile } from "./dry/createFile";
+export { deleteFile } from "./dry/deleteFile";
+export { executeCommand } from "./dry/executeCommand";
+export { getContext } from "./dry/getContext";
+export { listDir } from "./dry/listDir";
+export { readFile } from "./dry/readFile";
+export { saveContext } from "./dry/saveContext";
+export { testBuild } from "./dry/testBuild";
+export { updateFile } from "./dry/updateFile";
+export { writeMultipleFile } from "./dry/writeMultipleFile";

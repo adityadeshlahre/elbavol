@@ -63,12 +63,16 @@ export const serveTheProject = async (
 	const port = 3000;
 
 	try {
-		const killProc = Bun.spawn(["sh", "-c", `lsof -ti:${port} | xargs kill -9 2>/dev/null || true`], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
+		const killProc = Bun.spawn(
+			["sh", "-c", `lsof -ti:${port} | xargs kill -9 2>/dev/null || true`],
+			{
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
 		await killProc.exited;
 	} catch (error) {
+		console.error(`Failed to free port ${port}:`, error);
 	}
 
 	const proc = Bun.spawn(["sh", "-c", `cd "${dir}" && ${startScript}`], {
