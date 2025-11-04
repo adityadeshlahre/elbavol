@@ -9,8 +9,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-var router *echo.Echo
-
 func SetChatRouter(r *echo.Echo) {
 	router = r
 }
@@ -35,9 +33,9 @@ func ChatMessageHandler(c echo.Context) error {
 	}
 	prompt := chatReq.Prompt
 
-	err = clients.KafkaSenderClientToOrchestrator.WriteMessage(
+	err := clients.KafkaSenderClientToOrchestrator.WriteMessage(
 		[]byte(projectId),
-		[]byte(sharedTypes.CHAT_MESSAGE_RECEIVED+"|"+prompt),
+		[]byte(sharedTypes.PROMPT+"|"+prompt),
 	)
 	if err != nil {
 		return c.String(500, "Failed to send message")
@@ -54,7 +52,7 @@ func ChatMessageHandler(c echo.Context) error {
 		responseId := string(msg.Key)
 		response := string(msg.Value)
 
-		if responseId == projectId && response == sharedTypes.CHAT_MESSAGE_PROCESSED {
+		if responseId == projectId && response == sharedTypes.PROMPT_RESPONSE {
 			return c.String(200, response)
 		}
 	}
