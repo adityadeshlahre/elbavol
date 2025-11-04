@@ -47,7 +47,7 @@ func CreateProjectHandler(c echo.Context) error {
 		response := string(msg.Value)
 
 		if projectId == id && response == sharedTypes.PROJECT_CREATED {
-			return c.String(200, "Project created with ID: "+projectId)
+			return c.String(200, projectId)
 		}
 	}
 }

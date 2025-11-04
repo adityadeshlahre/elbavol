@@ -19,16 +19,21 @@ export const checkMissingPackage = tool(
 				return { missing: packages, error: "package.json not found" };
 			}
 			const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-			const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
-			const missing = packages.filter(pkg => !deps[pkg]);
-			return { missing, installed: packages.filter(pkg => deps[pkg]) };
+			const deps = {
+				...packageJson.dependencies,
+				...packageJson.devDependencies,
+			};
+			const missing = packages.filter((pkg) => !deps[pkg]);
+			return { missing, installed: packages.filter((pkg) => deps[pkg]) };
 		} catch (error) {
 			return { error: `Failed to check packages: ${(error as Error).message}` };
 		}
 	},
 	{
 		name: "checkMissingPackage",
-		description: "Checks which packages are missing from package.json dependencies.",
+		description:
+			"Checks which packages are missing from package.json dependencies.",
 		schema: checkMissingPackageInput,
 	},
 );
+

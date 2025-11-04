@@ -1,7 +1,7 @@
 export { pushFilesToR2 } from "./r2PullPush/push";
 export { validateBuild } from "./code/validateBuild";
 export { buildSource } from "./code/buildSource";
-export { addAndRemoveDependency } from "./dry/addAndRemoveDependency";
+export { addDependency, removeDependency } from "./dry/addAndRemoveDependency";
 export { checkMissingPackage } from "./dry/checkMissingPackage";
 export { createFile } from "./dry/createFile";
 export { deleteFile } from "./dry/deleteFile";
