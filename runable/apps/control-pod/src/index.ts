@@ -6,6 +6,7 @@ import { listObjects, getObject } from "@elbavol/r2";
 import fs from "fs";
 import path from "path";
 import { buildProjectAndNotifyToRun } from "./agent/tool/code/buildSource";
+import { agentInterface } from "./agent/interface";
 
 console.log("Global POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
@@ -169,25 +170,30 @@ async function start() {
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
 
+			if (!projectId || !value) return;
+
 			switch (value) {
 				case MESSAGE_KEYS.PROJECT_INITIALIZED:
-					if (projectId) {
-						console.log(`Initializing project ${projectId}`);
-						await pushProjectInitializationToServingPod(projectId, producer);
-					}
+					console.log(`Initializing project ${projectId}`);
+					await pushProjectInitializationToServingPod(projectId, producer);
 					break;
+				
 				case MESSAGE_KEYS.PROJECT_BUILD:
-					if (projectId) {
-						const s = await buildProjectAndNotifyToRun(projectId, producer);
-						s
-							? console.log(`Project ${projectId} built successfully.`)
-							: console.log(`Project ${projectId} build failed.`);
-					}
+					const buildSuccess = await buildProjectAndNotifyToRun(projectId, producer);
+					buildSuccess
+						? console.log(`Project ${projectId} built successfully.`)
+						: console.log(`Project ${projectId} build failed.`);
 					break;
+
 				default:
-					console.log(
-						`Received unknown message: ${value} for project: ${projectId}`,
-					);
+					if (value.startsWith("PROMPT:")) {
+						const prompt = value.replace("PROMPT:", "").trim();
+						console.log(`Processing prompt for project ${projectId}: ${prompt}`);
+						const result = await agentInterface.processUserPrompt(projectId, prompt, producer);
+						console.log(`Agent processing result:`, result);
+					} else {
+						console.log(`Received unknown message: ${value} for project: ${projectId}`);
+					}
 					break;
 			}
 		},

@@ -2,12 +2,17 @@
   "name": "@elbavol/types",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "check-types": "bunx tsc --noEmit --strict index.ts",
+    "build": "bunx tsc --noEmit --strict index.ts"
+  },
   "exports": {
     ".": "./index.ts",
     "./*": "./*.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "typescript": "^5"
