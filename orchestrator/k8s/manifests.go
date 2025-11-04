@@ -155,7 +155,7 @@ func CreatePodDevelopmentDeployment(
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "service-" + strings.ToLower(projectId),
+			Name: strings.ToLower(projectId),
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
