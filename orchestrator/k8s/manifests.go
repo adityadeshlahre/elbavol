@@ -13,12 +13,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func CreatePodDevelopmentDeployment(
+func CreateNodeDevelopmentDeployment(
 	clientSet *kubernetes.Clientset,
 	namespace string,
 	projectId string,
 ) error {
-	replicaCount := int32(1)
+	replicaCount := int32(2)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -123,16 +123,7 @@ func CreatePodDevelopmentDeployment(
 
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: 5173,
-								},
-								{
 									ContainerPort: 3000,
-								},
-								{
-									ContainerPort: 3001,
-								},
-								{
-									ContainerPort: 8080,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -156,6 +147,9 @@ func CreatePodDevelopmentDeployment(
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: strings.ToLower(projectId),
+			Labels: map[string]string{
+				"project": projectId,
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
@@ -163,7 +157,7 @@ func CreatePodDevelopmentDeployment(
 			},
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "http",
+					Name:       "vite",
 					Port:       3000,
 					TargetPort: intstr.FromInt(3000),
 				},
@@ -175,6 +169,37 @@ func CreatePodDevelopmentDeployment(
 	_, err = clientSet.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create pod development service: %v", err)
+	}
+
+	return nil
+}
+
+func DeleteNodeDevelopmentDeployment(
+	clientSet *kubernetes.Clientset,
+	namespace string,
+	projectId string,
+) error {
+	deletePolicy := metav1.DeletePropagationForeground
+	err := clientSet.AppsV1().Deployments(namespace).Delete(
+		context.Background(),
+		"pod-"+strings.ToLower(projectId),
+		metav1.DeleteOptions{
+			PropagationPolicy: &deletePolicy,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete pod development deployment: %v", err)
+	}
+
+	err = clientSet.CoreV1().Services(namespace).Delete(
+		context.Background(),
+		strings.ToLower(projectId),
+		metav1.DeleteOptions{
+			PropagationPolicy: &deletePolicy,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete pod development service: %v", err)
 	}
 
 	return nil

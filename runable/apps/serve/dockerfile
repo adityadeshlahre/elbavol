@@ -53,6 +53,9 @@ COPY --from=prerelease /usr/src/app/package.json .
 # compile the app
 RUN cd apps/serve && bun run compile
 
+# clean up unnecessary files to reduce image size
+RUN rm -rf apps/*/src apps/*/*.map packages/*/src packages/*/*.map *.map
+
 # run the app
 USER bun
 EXPOSE 5173/tcp

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/adityadeshlahre/elbavol/prime/clients"
 	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
@@ -17,6 +18,7 @@ func ChatRoutes() {
 	chatGroup := router.Group("/{projectId}")
 	{
 		chatGroup.POST("", ChatMessageHandler)
+		chatGroup.GET("", GetProjectChatByIdHandler)
 	}
 }
 
@@ -33,7 +35,20 @@ func ChatMessageHandler(c echo.Context) error {
 	}
 	prompt := chatReq.Prompt
 
-	err := clients.KafkaSenderClientToOrchestrator.WriteMessage(
+	file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return c.String(404, "project doesn't exist")
+		}
+		return c.String(500, "Failed to open file")
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString("User: " + prompt + "\n"); err != nil {
+		return c.String(500, "Failed to write to file")
+	}
+
+	err = clients.KafkaSenderClientToOrchestrator.WriteMessage(
 		[]byte(projectId),
 		[]byte(sharedTypes.PROMPT+"|"+prompt),
 	)
@@ -52,8 +67,26 @@ func ChatMessageHandler(c echo.Context) error {
 		responseId := string(msg.Key)
 		response := string(msg.Value)
 
-		if responseId == projectId && response == sharedTypes.PROMPT_RESPONSE {
+		if responseId == projectId && response != "" {
+			if _, err := file.WriteString("AI: " + response + "\n"); err != nil {
+				return c.String(500, "Failed to write to file")
+			}
 			return c.String(200, response)
 		}
 	}
+}
+
+func GetProjectChatByIdHandler(c echo.Context) error {
+	projectId := c.Param("projectId")
+	filePath := "/tmp/" + projectId + ".txt"
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return c.String(404, "chat doesn't exist")
+		}
+		return c.String(500, "Failed to read file")
+	}
+
+	return c.String(200, string(content))
 }

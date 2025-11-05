@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"log"
-	"os"
+	"strings"
 
 	"github.com/adityadeshlahre/elbavol/orchestrator/k8s"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
@@ -19,17 +19,17 @@ func CreateProjectHandler(
 	senderToBackend *kafkaShared.KafkaClientWriter,
 ) {
 	// create /tmp/{projectId}.txt file for storing conversation history
-	file, err := os.Create("/tmp/" + projectId + ".txt")
-	if err != nil {
-		log.Printf("Error creating file for project %s: %v", projectId, err)
-		return
-	}
-	file.Close()
+	// file, err := os.Create("/tmp/" + projectId + ".txt")
+	// if err != nil {
+	// 	log.Printf("Error creating file for project %s: %v", projectId, err)
+	// 	return
+	// }
+	// file.Close()
 
 	namespace := "default"
 
 	// Create development deployment
-	err = k8s.CreatePodDevelopmentDeployment(k8sClient, namespace, projectId)
+	err := k8s.CreateNodeDevelopmentDeployment(k8sClient, namespace, projectId)
 	if err != nil {
 		log.Printf("Error creating development deployment for project %s: %v", projectId, err)
 		return
@@ -64,22 +64,76 @@ func CreateProjectHandler(
 
 }
 
-func GetProjectByIdHandler(projectId string) {
-	// read projectId.txt file and return conversation history
+func DeleteProjectHandler(projectId string,
+	k8sClient *kubernetes.Clientset,
+	senderToBackend *kafkaShared.KafkaClientWriter) {
+	namespace := "default"
+
+	// Delete development deployment
+	err := k8s.DeleteNodeDevelopmentDeployment(k8sClient, namespace, projectId)
+	if err != nil {
+		log.Printf("Error deleting development deployment for project %s: %v", projectId, err)
+		return
+	}
+
+	// Send deletion confirmation to backend
+	err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_DELETED))
+	if err != nil {
+		log.Printf("Error sending project deleted confirmation to backend: %v", err)
+		return
+	}
+
 }
 
-func DeleteProjectHandler(projectId string) {
-	// delete projectId.txt file
-	// send message to brocker via pubsub to delete all pods related to this projectId (github repo deletion case)
+func ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubHandler(
+	projectId string,
+	prompt string,
+	senderToControl *kafkaShared.KafkaClientWriter,
+	recevingFromControl *kafkaShared.KafkaClientReader,
+	senderToBackend *kafkaShared.KafkaClientWriter,
+) {
+	err := senderToControl.WriteMessage(
+		[]byte(projectId),
+		[]byte(sharedTypes.PROMPT+"|"+prompt),
+	)
+	if err != nil {
+		log.Printf("Failed to send prompt to control pod for project %s: %v", projectId, err)
+		return
+	}
 
-}
+	// Await response from control pod
+	ctx := context.Background()
+	for {
+		msg, err := recevingFromControl.Reader.ReadMessage(ctx)
+		if err != nil {
+			log.Printf("Error reading message from control pod: %v", err)
+			continue
+		}
+		responseId := string(msg.Key)
+		response := string(msg.Value)
 
-func ReceivePromptAndSendToProjectNodePubSubHandler(projectId string, prompt string) {
-	// this will receive prompt from backend and send to project node via pubsub
+		sepIndex := strings.Index(response, "|")
+		if sepIndex == -1 {
+			log.Printf("Malformed response: %v", response)
+			continue
+		}
 
-}
+		header := strings.TrimSpace(response[:sepIndex])
+		payload := strings.TrimSpace(response[sepIndex+1:])
 
-func SendLLMResponseFromProjectNodeToBackendPubSubHandler(projectId string, response string) {
-	// this will receive llm response from project node via pubsub and send to backend via pubsub to do server-sent events
+		if responseId == projectId && strings.Contains(header, sharedTypes.PROMPT_RESPONSE) {
+			err = senderToBackend.WriteMessage(
+				[]byte(projectId),
+				[]byte(payload),
+			)
 
+			if err != nil {
+				log.Printf("Failed to send LLM response to backend: %v", err)
+				return
+			}
+
+			log.Printf("Sent LLM response back to backend for project %s", projectId)
+			return
+		}
+	}
 }

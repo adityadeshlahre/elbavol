@@ -1,6 +1,20 @@
 name: lovable
 
 services:
+  control:
+    build:
+      context: .
+      dockerfile: ./runable/apps/control/dockerfile
+    image: elbavol-control:latest
+    container_name: elbavol-control
+
+  serve:
+    build:
+      context: .
+      dockerfile: ./runable/apps/serve/dockerfile
+    image: elbavol-serve:latest
+    container_name: elbavol-serve
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: lovable-zookeeper
