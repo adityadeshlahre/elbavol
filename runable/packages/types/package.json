@@ -1,5 +1,6 @@
 {
   "name": "@elbavol/types",
+  "main": "index.ts",
   "module": "index.ts",
   "type": "module",
   "scripts": {

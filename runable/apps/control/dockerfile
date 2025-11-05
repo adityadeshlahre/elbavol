@@ -11,9 +11,9 @@ RUN mkdir -p /temp/dev
 COPY package.json bun.lock /temp/dev/
 # Copy packages
 COPY packages /temp/dev/packages/
-# Copy control-pod files
-COPY apps/control-pod/package.json /temp/dev/apps/control-pod/
-RUN cd /temp/dev && bun install --frozen-lockfile
+# Copy control files
+COPY apps/control/package.json /temp/dev/apps/control/
+RUN cd /temp/dev && bun install
 
 # install with --production (exclude devDependencies)
 RUN mkdir -p /temp/prod
@@ -21,33 +21,39 @@ RUN mkdir -p /temp/prod
 COPY package.json bun.lock /temp/prod/
 # Copy packages
 COPY packages /temp/prod/packages/
-# Copy control-pod files
-COPY apps/control-pod/package.json /temp/prod/apps/control-pod/
-RUN cd /temp/prod && bun install --frozen-lockfile --production
+# Copy control files
+COPY apps/control/package.json /temp/prod/apps/control/
+RUN cd /temp/prod && bun install
 
 # copy node_modules from temp directory
 # then copy all (non-ignored) project files into the image
 FROM base AS prerelease
+COPY --from=install /temp/dev/package.json .
+COPY --from=install /temp/dev/bun.lock .
 COPY --from=install /temp/dev/node_modules node_modules
 # Copy workspace packages
 COPY packages ./packages/
-# Copy control-pod source
-COPY apps/control-pod .
+# Copy apps
+COPY apps ./apps
+# Link workspace packages
+RUN bun install
 
 # [optional] tests & build
 ENV NODE_ENV=production
-RUN bun test
-RUN bun run build
+RUN cd apps/control && bun run compile
 
 # copy production dependencies and source code into final image
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules
 # Copy workspace packages
 COPY --from=prerelease /usr/src/app/packages ./packages/
-COPY --from=prerelease /usr/src/app/apps/control-pod/dist/index.js .
-COPY --from=prerelease /usr/src/app/apps/control-pod/package.json .
+COPY --from=prerelease /usr/src/app/apps ./apps
+COPY --from=prerelease /usr/src/app/package.json .
+
+# compile the app
+RUN cd apps/control && bun run compile
 
 # run the app
 USER bun
 EXPOSE 3000/tcp
-ENTRYPOINT [ "bun", "run", "dist/index.js" ]
+ENTRYPOINT [ "bun", "run", "index.js" ]

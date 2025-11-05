@@ -13,3 +13,4 @@ export { saveContext } from "./dry/saveContext";
 export { testBuild } from "./dry/testBuild";
 export { updateFile } from "./dry/updateFile";
 export { writeMultipleFile } from "./dry/writeMultipleFile";
+export { promptAnalyzer } from "./analysis/promptAnalyzer";

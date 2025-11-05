@@ -1,5 +1,6 @@
 {
   "name": "@elbavol/r2",
+  "main": "index.ts",
   "module": "index.ts",
   "type": "module",
   "exports": {
