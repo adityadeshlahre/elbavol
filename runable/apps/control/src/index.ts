@@ -10,7 +10,14 @@ import { agentInterface } from "./agent/interface";
 
 console.log("Global POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
-	CORS_ORIGIN: process.env.CORS_ORIGIN,
+	PROJECT_ID: process.env.PROJECT_ID,
+	BUCKET_NAME: process.env.BUCKET_NAME,
+	KAFKA_BROKERS: process.env.KAFKA_BROKERS,
+	CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+	CLOUDFLARE_ACCESS_KEY_ID: process.env.CLOUDFLARE_ACCESS_KEY_ID,
+	CLOUDFLARE_SECRET_ACCESS_KEY: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
+	GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+	OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 });
 
 export const projectId = process.env.PROJECT_ID || "";
@@ -177,7 +184,7 @@ async function start() {
 					console.log(`Initializing project ${projectId}`);
 					await pushProjectInitializationToServingPod(projectId, producer);
 					break;
-				
+
 				case MESSAGE_KEYS.PROJECT_BUILD:
 					const buildSuccess = await buildProjectAndNotifyToRun(projectId, producer);
 					buildSuccess
