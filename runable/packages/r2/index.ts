@@ -23,14 +23,17 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 
-export const S3 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+const s3Config = {
+  region: "us-east-1",
+  endpoint: process.env.MINIO_ENDPOINT,
   credentials: {
-    accessKeyId: process.env.CF_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.CF_SECRET_ACCESS_KEY!,
+    accessKeyId: process.env.MINIO_ACCESS_KEY!,
+    secretAccessKey: process.env.MINIO_SECRET_KEY!,
   },
-});
+  forcePathStyle: true,
+};
+
+export const S3 = new S3Client(s3Config);
 
 export async function createBucket(
   params: CreateBucketCommandInput,

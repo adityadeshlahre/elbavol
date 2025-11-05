@@ -1,21 +1,44 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	caddyfile := `*.localhost {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found, proceeding with environment variables")
+	}
+
+	domain := os.Getenv("DOMAIN")
+	if domain == "" {
+		domain = "localhost"
+	}
+
+	caddyfile := fmt.Sprintf(`minio.%s {
+		tls internal
+		reverse_proxy minio:9001
+	}
+
+	api.%s {
+		tls internal
+		reverse_proxy prime:8080
+	}
+
+	*.%s {
 		tls internal
 		reverse_proxy {http.request.host.labels.3}.default.svc.cluster.local:3000
 	}
 
 	respond "Not Found" 404
-`
+`, domain, domain, domain)
 
-	err := os.WriteFile("/tmp/Caddyfile", []byte(caddyfile), 0644)
+	err = os.WriteFile("/tmp/Caddyfile", []byte(caddyfile), 0644)
 	if err != nil {
 		log.Fatal("Failed to write Caddyfile:", err)
 	}

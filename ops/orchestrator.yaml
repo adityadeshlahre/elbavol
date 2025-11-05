@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: aivalacoder/elbavol-orchestrator:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KAFKA_URL
+              value: "kafka:9092"
+            - name: GOOGLE_API_KEY
+              value: ""
+            - name: OPENROUTER_API_KEY
+              value: ""
+            - name: MINIO_ENDPOINT
+              value: "http://minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: "MINIO_ROOT_USER"
+            - name: MINIO_SECRET_KEY
+              value: "MINIO_ROOT_PASSWORD"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  namespace: default
+spec:
+  selector:
+    app: orchestrator
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

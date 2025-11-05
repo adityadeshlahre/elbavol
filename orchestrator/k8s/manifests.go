@@ -62,7 +62,7 @@ func CreateNodeDevelopmentDeployment(
 									Name: "BUCKET_NAME", Value: "elbavol",
 								},
 								{
-									Name: "KAFKA_URL", Value: "kafka-service:9092",
+									Name: "KAFKA_URL", Value: "kafka:9092",
 								},
 								{
 									Name:  "GOOGLE_API_KEY",
@@ -73,16 +73,16 @@ func CreateNodeDevelopmentDeployment(
 									Value: os.Getenv("OPENROUTER_API_KEY"),
 								},
 								{
-									Name:  "CLOUDFLARE_ACCOUNT_ID",
-									Value: os.Getenv("CF_ACCOUNT_ID"),
+									Name:  "MINIO_ENDPOINT",
+									Value: os.Getenv("MINIO_ENDPOINT"),
 								},
 								{
-									Name:  "CLOUDFLARE_ACCESS_KEY_ID",
-									Value: os.Getenv("CF_ACCESS_KEY_ID"),
+									Name:  "MINIO_ACCESS_KEY",
+									Value: os.Getenv("MINIO_ACCESS_KEY"),
 								},
 								{
-									Name:  "CLOUDFLARE_SECRET_ACCESS_KEY",
-									Value: os.Getenv("CF_SECRET_ACCESS_KEY"),
+									Name:  "MINIO_SECRET_KEY",
+									Value: os.Getenv("MINIO_SECRET_KEY"),
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -105,19 +105,19 @@ func CreateNodeDevelopmentDeployment(
 									Name: "BUCKET_NAME", Value: "elbavol",
 								},
 								{
-									Name: "KAFKA_URL", Value: "kafka-service:9092",
+									Name: "KAFKA_URL", Value: "kafka:9092",
 								},
 								{
-									Name:  "CLOUDFLARE_ACCOUNT_ID",
-									Value: os.Getenv("CF_ACCOUNT_ID"),
+									Name:  "MINIO_ENDPOINT",
+									Value: os.Getenv("MINIO_ENDPOINT"),
 								},
 								{
-									Name:  "CLOUDFLARE_ACCESS_KEY_ID",
-									Value: os.Getenv("CF_ACCESS_KEY_ID"),
+									Name:  "MINIO_ACCESS_KEY",
+									Value: os.Getenv("MINIO_ACCESS_KEY"),
 								},
 								{
-									Name:  "CLOUDFLARE_SECRET_ACCESS_KEY",
-									Value: os.Getenv("CF_SECRET_ACCESS_KEY"),
+									Name:  "MINIO_SECRET_KEY",
+									Value: os.Getenv("MINIO_SECRET_KEY"),
 								},
 							},
 
