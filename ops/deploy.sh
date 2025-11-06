@@ -26,13 +26,13 @@ echo "Deploying Orchestrator..."
 kubectl apply -f orchestrator.yaml
 
 echo "Waiting for Orchestrator to be ready..."
-kubectl wait --for=condition=available --timeout=300s deployment/orchestrator
+kubectl wait --for=condition=available --timeout=60s deployment/orchestrator
 
 echo "Deploying Prime..."
 kubectl apply -f prime.yaml
 
 echo "Waiting for Prime to be ready..."
-kubectl wait --for=condition=available --timeout=300s deployment/prime
+kubectl wait --for=condition=available --timeout=60s deployment/prime
 
 echo "Deploying Ingress..."
 kubectl apply -f ingress.yaml

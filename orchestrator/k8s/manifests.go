@@ -52,7 +52,7 @@ func CreateNodeDevelopmentDeployment(
 					Containers: []corev1.Container{
 						{
 							Name:  "controller",
-							Image: fmt.Sprintf("%s/elbavol-controller:latest", os.Getenv("DOCKER_USER_NAME")),
+							Image: fmt.Sprintf("%s/control:latest", os.Getenv("DOCKER_USER_NAME")),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "PROJECT_ID",
@@ -95,7 +95,7 @@ func CreateNodeDevelopmentDeployment(
 
 						{
 							Name:  "serving",
-							Image: fmt.Sprintf("%s/elbavol-serving:latest", os.Getenv("DOCKER_USER_NAME")),
+							Image: fmt.Sprintf("%s/serve:latest", os.Getenv("DOCKER_USER_NAME")),
 							Env: []corev1.EnvVar{
 								{
 									Name:  "PROJECT_ID",
