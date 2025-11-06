@@ -35,8 +35,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-ingress:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Build and Push Orchestrator Image
         uses: docker/build-push-action@v4
@@ -46,8 +44,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-orchestrator:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Build and Push Prime Image
         uses: docker/build-push-action@v4
@@ -57,8 +53,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-prime:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Build and Push Control Image
         uses: docker/build-push-action@v4
@@ -68,8 +62,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-control:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Build and Push Serve Image
         uses: docker/build-push-action@v4
@@ -79,5 +71,3 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-serve:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
