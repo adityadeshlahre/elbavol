@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: prime
-          image: aivalacoder/elbavol-prime:latest
+          image: gcr.io/elegant-zodiac-470908-i0/prime:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
