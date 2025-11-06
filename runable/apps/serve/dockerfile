@@ -18,8 +18,8 @@ FROM base AS prerelease
 COPY --from=install /temp/dev/package.json .
 COPY --from=install /temp/dev/bun.lock .
 COPY --from=install /temp/dev/node_modules node_modules
-COPY packages ./packages/
-COPY apps ./apps
+COPY --from=install /temp/dev/packages ./packages/
+COPY --from=install /temp/dev/apps ./apps
 RUN bun install
 
 ENV NODE_ENV=production

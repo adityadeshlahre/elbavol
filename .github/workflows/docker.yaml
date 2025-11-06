@@ -27,6 +27,7 @@ jobs:
         with:
           context: .
           file: ./ingress/Dockerfile
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-ingress:latest
 
@@ -35,6 +36,7 @@ jobs:
         with:
           context: .
           file: ./orchestrator/Dockerfile
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-orchestrator:latest
 
@@ -43,6 +45,7 @@ jobs:
         with:
           context: .
           file: ./prime/Dockerfile
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-prime:latest
 
@@ -50,7 +53,8 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./runable/apps/control/dockerfile
+          file: ./runable/apps/control/Dockerfile
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-control:latest
 
@@ -58,6 +62,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./runable/apps/serve/dockerfile
+          file: ./runable/apps/serve/Dockerfile
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-serve:latest
