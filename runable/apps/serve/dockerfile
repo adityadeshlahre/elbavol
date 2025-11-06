@@ -31,10 +31,9 @@ COPY --from=prerelease /usr/src/app/packages ./packages/
 COPY --from=prerelease /usr/src/app/apps ./apps
 COPY --from=prerelease /usr/src/app/package.json .
 
-RUN cd apps/serve && bun run compile
-
 RUN rm -rf apps/*/src apps/*/*.map packages/*/src packages/*/*.map *.map
 
+WORKDIR /usr/src/app/apps/serve
 USER bun
 EXPOSE 5173/tcp
 ENTRYPOINT [ "bun", "run", "index.js" ]

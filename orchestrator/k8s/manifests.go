@@ -62,7 +62,7 @@ func CreateNodeDevelopmentDeployment(
 									Name: "BUCKET_NAME", Value: "elbavol",
 								},
 								{
-									Name: "KAFKA_URL", Value: "kafka:9092",
+									Name: "KAFKA_URL", Value: "kafka-svc.default.svc.cluster.local:9092",
 								},
 								{
 									Name:  "GOOGLE_API_KEY",
@@ -105,7 +105,7 @@ func CreateNodeDevelopmentDeployment(
 									Name: "BUCKET_NAME", Value: "elbavol",
 								},
 								{
-									Name: "KAFKA_URL", Value: "kafka:9092",
+									Name: "KAFKA_URL", Value: "kafka-svc.default.svc.cluster.local:9092",
 								},
 								{
 									Name:  "MINIO_ENDPOINT",
