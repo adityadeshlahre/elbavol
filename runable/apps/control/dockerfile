@@ -3,15 +3,15 @@ WORKDIR /usr/src/app
 
 FROM base AS install
 RUN mkdir -p /temp/dev
-COPY package.json bun.lock /temp/dev/
-COPY packages /temp/dev/packages/
-COPY apps/control/package.json /temp/dev/apps/control/
+COPY runable/package.json runable/bun.lock /temp/dev/
+COPY runable/packages /temp/dev/packages/
+COPY runable/apps/control/package.json /temp/dev/apps/control/
 RUN cd /temp/dev && bun install
 
 RUN mkdir -p /temp/prod
-COPY package.json bun.lock /temp/prod/
-COPY packages /temp/prod/packages/
-COPY apps/control/package.json /temp/prod/apps/control/
+COPY runable/package.json runable/bun.lock /temp/prod/
+COPY runable/packages /temp/prod/packages/
+COPY runable/apps/control/package.json /temp/prod/apps/control/
 RUN cd /temp/prod && bun install
 
 FROM base AS prerelease
@@ -19,7 +19,7 @@ COPY --from=install /temp/dev/package.json .
 COPY --from=install /temp/dev/bun.lock .
 COPY --from=install /temp/dev/node_modules node_modules
 COPY --from=install /temp/dev/packages ./packages/
-COPY --from=install /temp/dev/apps ./apps
+COPY runable/apps ./apps
 RUN bun install
 
 ENV NODE_ENV=production
