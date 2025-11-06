@@ -21,24 +21,14 @@ func main() {
 		domain = "localhost"
 	}
 
-	caddyfile := fmt.Sprintf(`minio.%s {
-		tls internal
-		reverse_proxy minio:9001
-	}
-
-	api.%s {
-		tls internal
-		reverse_proxy prime:8080
-	}
-
-	*.%s {
+	caddyfile := fmt.Sprintf(`*.%s {
 		tls internal
 		reverse_proxy {http.request.host.labels.3}.default.svc.cluster.local:3000
 		handle_errors {
 			respond "404 Not Found" 404
 		}
 	}
-`, domain, domain, domain)
+`, domain)
 
 	err = os.WriteFile("/tmp/Caddyfile", []byte(caddyfile), 0644)
 	if err != nil {

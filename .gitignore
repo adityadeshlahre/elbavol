@@ -141,3 +141,4 @@ lerna-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 CRUSH.md
+AGENTS.md
