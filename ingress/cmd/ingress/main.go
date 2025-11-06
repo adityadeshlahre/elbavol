@@ -1,3 +1,4 @@
+// Fixed Caddyfile
 package main
 
 import (
@@ -33,9 +34,10 @@ func main() {
 	*.%s {
 		tls internal
 		reverse_proxy {http.request.host.labels.3}.default.svc.cluster.local:3000
+		handle_errors {
+			respond "404 Not Found" 404
+		}
 	}
-
-	respond "Not Found" 404
 `, domain, domain, domain)
 
 	err = os.WriteFile("/tmp/Caddyfile", []byte(caddyfile), 0644)
@@ -43,7 +45,7 @@ func main() {
 		log.Fatal("Failed to write Caddyfile:", err)
 	}
 
-	cmd := exec.Command("caddy", "run", "--config", "/tmp/Caddyfile")
+	cmd := exec.Command("/usr/bin/caddy", "run", "--config", "/tmp/Caddyfile")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()

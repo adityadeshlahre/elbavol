@@ -16,6 +16,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o ingress ./cmd/ingress
 
 FROM alpine:latest
 
+RUN apk add --no-cache ca-certificates curl && curl -o /usr/bin/caddy "https://caddyserver.com/api/download?os=linux&arch=arm64" && chmod +x /usr/bin/caddy
+
 WORKDIR /root/
 
 COPY --from=builder /app/ingress/ingress .

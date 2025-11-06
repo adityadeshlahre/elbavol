@@ -16,6 +16,7 @@ spec:
       containers:
         - name: prime
           image: aivalacoder/elbavol-prime:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:

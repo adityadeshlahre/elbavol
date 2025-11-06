@@ -16,6 +16,7 @@ spec:
       containers:
         - name: orchestrator
           image: aivalacoder/elbavol-orchestrator:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:

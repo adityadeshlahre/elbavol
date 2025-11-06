@@ -1,5 +1,3 @@
-name: lovable
-
 services:
   control:
     build:
@@ -56,7 +54,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: lovable-minio
+    container_name: elbavol-minio
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -69,7 +67,7 @@ services:
 
   kafka:
     image: bitnami/kafka:latest
-    container_name: lovable-kafka
+    container_name: elbavol-kafka
     ports:
       - "9092:9092"
     environment:
@@ -91,9 +89,9 @@ volumes:
     driver: local
   kafka-data:
     driver: local
-  lovable-kafka-data:
+  elbavol-kafka-data:
     driver: local
-  lovable-zookeeper-data:
+  elbavol-zookeeper-data:
     driver: local
-  lovable-zookeeper-log:
+  elbavol-zookeeper-log:
     driver: local

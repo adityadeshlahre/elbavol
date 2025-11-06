@@ -8,14 +8,14 @@ import path from "path";
 import { buildProjectAndNotifyToRun } from "./agent/tool/code/buildSource";
 import { agentInterface } from "./agent/interface";
 
-console.log("Global POD started with env:", {
+console.log("Control POD started with env:", {
 	NODE_ENV: process.env.NODE_ENV,
 	PROJECT_ID: process.env.PROJECT_ID,
 	BUCKET_NAME: process.env.BUCKET_NAME,
 	KAFKA_BROKERS: process.env.KAFKA_BROKERS,
-	CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
-	CLOUDFLARE_ACCESS_KEY_ID: process.env.CLOUDFLARE_ACCESS_KEY_ID,
-	CLOUDFLARE_SECRET_ACCESS_KEY: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
+	MINIO_ENDPOINT: process.env.MINIO_ENDPOINT,
+	MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY,
+	MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY,
 	GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
 	OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 });

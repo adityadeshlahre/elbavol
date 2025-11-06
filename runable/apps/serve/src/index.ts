@@ -9,9 +9,9 @@ console.log("Servering POD started with env:", {
 	PROJECT_ID: process.env.PROJECT_ID,
 	BUCKET_NAME: process.env.BUCKET_NAME,
 	KAFKA_BROKERS: process.env.KAFKA_BROKERS,
-	CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
-	CLOUDFLARE_ACCESS_KEY_ID: process.env.CLOUDFLARE_ACCESS_KEY_ID,
-	CLOUDFLARE_SECRET_ACCESS_KEY: process.env.CLOUDFLARE_SECRET_ACCESS_KEY,
+	MINIO_ENDPOINT: process.env.MINIO_ENDPOINT,
+	MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY,
+	MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY,
 });
 
 export let projectRunning = false;
