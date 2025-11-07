@@ -32,7 +32,7 @@ export class AgentHandler {
         console.log(`Agent completed successfully for project ${projectId}`);
         
         await producer.send({
-          topic: TOPIC.BETWEEN_PODS,
+          topic: TOPIC.SERVING_TO_CONTROL, // maybe wrong here
           messages: [{
             key: projectId,
             value: JSON.stringify({
@@ -50,7 +50,7 @@ export class AgentHandler {
         console.error(`Agent failed for project ${projectId}:`, response.error);
         
         await producer.send({
-          topic: TOPIC.BETWEEN_PODS,
+          topic: TOPIC.SERVING_TO_CONTROL, // maybe wrong here
           messages: [{
             key: projectId,
             value: JSON.stringify({
@@ -67,7 +67,7 @@ export class AgentHandler {
       console.error(`Agent handler error for project ${projectId}:`, error);
       
       await producer.send({
-        topic: TOPIC.BETWEEN_PODS,
+        topic: TOPIC.SERVING_TO_CONTROL, // maybe wrong here
         messages: [{
           key: projectId,
           value: JSON.stringify({
@@ -109,7 +109,7 @@ export class AgentHandler {
       
       if (state && state.context.metadata.buildStatus === "success") {
         await producer.send({
-          topic: TOPIC.BETWEEN_PODS,
+          topic: TOPIC.CONTROL_TO_SERVING,
           messages: [{
             key: projectId,
             value: MESSAGE_KEYS.PROJECT_BUILD

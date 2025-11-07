@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingress
+  template:
+    metadata:
+      labels:
+        app: ingress
+    spec:
+       containers:
+         - name: ingress
+           image: aivalacoder/elbavol-ingress:latest
+           imagePullPolicy: Never
+           ports:
+             - containerPort: 80
+             - containerPort: 443
+           env:
+             - name: DOMAIN
+               value: "localhost"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress
+  namespace: default
+spec:
+  selector:
+    app: ingress
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
+  type: LoadBalancer

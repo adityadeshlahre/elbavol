@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: ./runable/apps/control/Dockerfile
+      platforms:
+        - linux/amd64
     image: elbavol-control:latest
     container_name: elbavol-control
 
@@ -10,6 +12,8 @@ services:
     build:
       context: .
       dockerfile: ./runable/apps/serve/Dockerfile
+      platforms:
+        - linux/amd64
     image: elbavol-serve:latest
     container_name: elbavol-serve
 
@@ -17,6 +21,8 @@ services:
     build:
       context: .
       dockerfile: ./ingress/Dockerfile
+      platforms:
+        - linux/amd64
     image: elbavol-ingress:latest
     container_name: elbavol-ingress
     ports:
@@ -28,6 +34,8 @@ services:
     build:
       context: .
       dockerfile: ./orchestrator/Dockerfile
+      platforms:
+        - linux/amd64
     image: elbavol-orchestrator:latest
     container_name: elbavol-orchestrator
     ports:
@@ -42,6 +50,8 @@ services:
     build:
       context: .
       dockerfile: ./prime/Dockerfile
+      platforms:
+        - linux/amd64
     image: elbavol-prime:latest
     container_name: elbavol-prime
     ports:

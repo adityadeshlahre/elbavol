@@ -18,9 +18,10 @@ console.log("Control POD started with env:", {
 	MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY,
 	GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
 	OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+	SHARED_DIR: process.env.SHARED_DIR,
 });
 
-export const projectId = process.env.PROJECT_ID || "";
+export const ProjectId = process.env.PROJECT_ID || ""; // fix this in prod
 export const bucketName = process.env.BUCKET_NAME || "";
 
 export const processing = new Map<
@@ -39,8 +40,8 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({ groupId: GROUP_ID.CONTROL_POD });
 
-export const consumerBetweenPods = kafka.consumer({
-	groupId: GROUP_ID.BETWEEN_PODS,
+export const consumerControlFromServe = kafka.consumer({
+	groupId: GROUP_ID.CONTROL_TO_SERVING,
 });
 
 async function connectProducer() {
@@ -79,7 +80,7 @@ async function disconnectConsumer() {
 	}
 }
 
-async function pullTemplateFromR2RenameItAsProject() {
+async function pullTemplateFromR2RenameItAsProject(projectId: string = ProjectId) { // fix in prod
 	try {
 		const { Contents } = await listObjects({
 			Bucket: bucketName,
@@ -90,7 +91,7 @@ async function pullTemplateFromR2RenameItAsProject() {
 			throw new Error("No template files found in bucket");
 		}
 
-		const sharedDir = "/app/shared";
+		const sharedDir = process.env.SHARED_DIR || "/app/shared"; // fix in prod
 		const projectDir = path.join(sharedDir, projectId);
 
 		if (!fs.existsSync(sharedDir)) {
@@ -136,9 +137,9 @@ async function pullTemplateFromR2RenameItAsProject() {
 		};
 
 		await producer.send({
-			topic: TOPIC.BETWEEN_PODS,
+			topic: TOPIC.CONTROL_TO_SERVING,
 			messages: [{ key: projectId, value: JSON.stringify(newObject) }],
-		});
+		}); // push build again
 
 		return {
 			success: true,
@@ -149,7 +150,7 @@ async function pullTemplateFromR2RenameItAsProject() {
 			newObject,
 		};
 	} catch (error) {
-		console.error("Error in createNewObjectAndCreateProject:", error);
+		console.error("Error in  pull code from bucket:", error);
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		return {
 			success: false,
@@ -165,7 +166,7 @@ async function start() {
 	console.log("Control POD is running...");
 	await connectProducer();
 	await connectConsumer();
-	await pullTemplateFromR2RenameItAsProject();
+	// await pullTemplateFromR2RenameItAsProject();
 
 	await consumer.subscribe({
 		topic: TOPIC.ORCHESTRATOR_TO_CONTROL,
@@ -174,6 +175,7 @@ async function start() {
 
 	await consumer.run({
 		eachMessage: async ({ message }) => {
+			console.log(JSON.stringify(message));
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
 
@@ -182,6 +184,7 @@ async function start() {
 			switch (value) {
 				case MESSAGE_KEYS.PROJECT_INITIALIZED:
 					console.log(`Initializing project ${projectId}`);
+					await pullTemplateFromR2RenameItAsProject(projectId); // need to remove in prod
 					await pushProjectInitializationToServingPod(projectId, producer);
 					break;
 
@@ -206,17 +209,17 @@ async function start() {
 		},
 	});
 
-	await consumerBetweenPods.subscribe({
-		topic: TOPIC.BETWEEN_PODS,
+	await consumerControlFromServe.subscribe({
+		topic: TOPIC.SERVING_TO_CONTROL,
 		fromBeginning: true,
 	});
 
-	await consumerBetweenPods.run({
+	await consumerControlFromServe.run({
 		eachMessage: async ({ message }) => {
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
 			switch (value) {
-				case TOPIC.BETWEEN_PODS:
+				case MESSAGE_KEYS.SERVE_PROJECT_INITIALIZATION_CONFIRMED:
 					if (projectId) {
 						const callback = processing.get(projectId);
 						if (callback) {
@@ -225,6 +228,7 @@ async function start() {
 						}
 					}
 					break;
+
 				default:
 					console.log(
 						`Received unknown message: ${value} for project: ${projectId}`,

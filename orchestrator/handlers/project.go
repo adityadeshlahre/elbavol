@@ -26,17 +26,17 @@ func CreateProjectHandler(
 	// }
 	// file.Close()
 
-	namespace := "default"
+	// namespace := "default"
 
 	// Create development deployment
-	err := k8s.CreateNodeDevelopmentDeployment(k8sClient, namespace, projectId)
-	if err != nil {
-		log.Printf("Error creating development deployment for project %s: %v", projectId, err)
-		return
-	}
+	// err := k8s.CreateNodeDevelopmentDeployment(k8sClient, namespace, projectId)
+	// if err != nil {
+	// 	log.Printf("Error creating development deployment for project %s: %v", projectId, err)
+	// 	return
+	// }
 
 	// Send message to control pod
-	err = senderToControl.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_INITIALIZED))
+	err := senderToControl.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_INITIALIZED))
 	if err != nil {
 		log.Printf("Error sending project initialized message to control pod for project %s: %v", projectId, err)
 		return

@@ -4,8 +4,8 @@
 # Checks if topics exist, creates them if not
 # Run this after Kafka is deployed and running
 
-KAFKA_POD="kafka-0"
-BOOTSTRAP_SERVER="kafka-svc.default.svc.cluster.local:9092"
+KAFKA_CONTAINER="elbavol-kafka"
+BOOTSTRAP_SERVER="localhost:9092"
 
 # List of topics to create
 TOPICS=(
@@ -26,11 +26,11 @@ echo "Checking and creating Kafka topics..."
 
 for topic in "${TOPICS[@]}"; do
   echo "Checking topic: $topic"
-  if kubectl exec $KAFKA_POD -- /usr/bin/kafka-topics --list --bootstrap-server $BOOTSTRAP_SERVER | grep -q "^$topic$"; then
+  if docker exec $KAFKA_CONTAINER /usr/bin/kafka-topics --list --bootstrap-server $BOOTSTRAP_SERVER | grep -q "^$topic$"; then
     echo "Topic $topic already exists"
   else
     echo "Creating topic $topic"
-    kubectl exec $KAFKA_POD -- /usr/bin/kafka-topics --create --topic $topic --bootstrap-server $BOOTSTRAP_SERVER --partitions 1 --replication-factor 1
+    docker exec $KAFKA_CONTAINER /usr/bin/kafka-topics --create --topic $topic --bootstrap-server $BOOTSTRAP_SERVER --partitions 1 --replication-factor 1
     if [ $? -eq 0 ]; then
       echo "Successfully created topic $topic"
     else

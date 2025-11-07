@@ -83,9 +83,9 @@ export const pushFilesToR2 = tool(
 			};
 
 			await producer.send({
-				topic: TOPIC.BETWEEN_PODS,
+				topic: TOPIC.CONTROL_TO_SERVING,
 				messages: [{ key: projectId, value: JSON.stringify(newObject) }],
-			});
+			}); // push build again
 
 			return {
 				success: true,

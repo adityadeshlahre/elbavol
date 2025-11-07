@@ -8,8 +8,9 @@ export const fetchFilesAndConfirmProject = async (
   projectId: string,
   producer: Producer,
 ) => {
+  console.log(`${process.env.SHARED_DIR}`);
   const bucketName = process.env.BUCKET_NAME || "elbavol";
-  const dir = path.join("/app/shared", projectId);
+  const dir = path.join(`${process.env.SHARED_DIR}` || "/app/shared", projectId);
   fs.mkdirSync(dir, { recursive: true });
 
   try {

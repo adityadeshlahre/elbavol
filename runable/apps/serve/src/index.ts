@@ -12,6 +12,7 @@ console.log("Servering POD started with env:", {
 	MINIO_ENDPOINT: process.env.MINIO_ENDPOINT,
 	MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY,
 	MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY,
+	SHARED_DIR: process.env.SHARED_DIR,
 });
 
 export let projectRunning = false;
@@ -30,13 +31,13 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({ groupId: GROUP_ID.SERVING_POD });
 
-export const consumerBetweenPods = kafka.consumer({
-	groupId: GROUP_ID.BETWEEN_PODS,
+export const consumerServeFromControl = kafka.consumer({
+	groupId: GROUP_ID.SERVING_TO_CONTROL,
 });
 
 async function connectConsumerBetweenPods() {
 	try {
-		await consumerBetweenPods.connect();
+		await consumerServeFromControl.connect();
 		console.log("Kafka Consumer Between Pods connected.");
 	} catch (error) {
 		console.error("Failed to connect Kafka Consumer Between Pods:", error);
@@ -45,7 +46,7 @@ async function connectConsumerBetweenPods() {
 
 async function disconnectConsumerBetweenPods() {
 	try {
-		await consumerBetweenPods.disconnect();
+		await consumerServeFromControl.disconnect();
 		console.log("Kafka Consumer Between Pods disconnected.");
 	} catch (error) {
 		console.error("Failed to disconnect Kafka Consumer Between Pods:", error);
@@ -94,22 +95,37 @@ async function start() {
 	await connectConsumer();
 	await connectConsumerBetweenPods();
 
-	await consumerBetweenPods.subscribe({
-		topic: TOPIC.BETWEEN_PODS,
+	await consumerServeFromControl.subscribe({
+		topic: TOPIC.CONTROL_TO_SERVING,
 		fromBeginning: true,
 	});
 
-	await consumerBetweenPods.run({
+	await consumerServeFromControl.run({
 		eachMessage: async ({ message }) => {
+			console.log(JSON.stringify(message));
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
 			switch (value) {
-				case MESSAGE_KEYS.PROJECT_INITIALIZED:
+				case MESSAGE_KEYS.SERVE_PROJECT_INITIALIZED:
 					if (projectId) {
 						console.log(`Fetching files for project ${projectId}`);
 						await fetchFilesAndConfirmProject(projectId, producer);
+						await producer.send({
+							topic: TOPIC.SERVING_TO_CONTROL,
+							messages: [
+								{
+									key: projectId,
+									value: JSON.stringify({
+										key: MESSAGE_KEYS.SERVE_PROJECT_INITIALIZATION_CONFIRMED,
+										success: true,
+										payload: JSON.stringify({ productId: projectId }),
+									}),
+								},
+							],
+						});
 					}
 					break;
+
 				case MESSAGE_KEYS.PROJECT_RUN:
 					if (projectId) {
 						await serveTheProject(projectId, producer);
