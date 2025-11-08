@@ -36,7 +36,7 @@ function getAllFiles(dirPath: string, relativeTo: string = dirPath): string[] {
 
 export const pushFilesToR2 = tool(
 	async (input: z.infer<typeof pushCodeInput>) => {
-		const { projectId, bucketName } = pushCodeInput.parse(input);
+		const { projectId, bucketName = "elbavol" } = pushCodeInput.parse(input);
 
 		try {
 			const sharedDir = "/app/shared";

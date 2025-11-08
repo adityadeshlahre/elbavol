@@ -105,6 +105,17 @@ export const buildProjectAndNotifyToRun = async (
 				},
 			],
 		});
+
+		await producer.send({
+			topic: TOPIC.CONTROL_TO_SERVING,
+			messages: [
+				{
+					key: projectId,
+					value: MESSAGE_KEYS.PROJECT_BUILD,
+				},
+			],
+		});
+
 		return true;
 	} catch (error) {
 		await producer.send({

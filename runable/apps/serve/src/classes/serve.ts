@@ -14,9 +14,9 @@ export const serveTheProject = async (
 			topic: TOPIC.SERVING_TO_ORCHESTRATOR,
 			messages: [
 				{
+					key: projectId,
 					value: JSON.stringify({
 						key: MESSAGE_KEYS.PROJECT_FAILED,
-						projectId,
 						error: "Project directory not found",
 					}),
 				},
@@ -31,9 +31,9 @@ export const serveTheProject = async (
 			topic: TOPIC.SERVING_TO_ORCHESTRATOR,
 			messages: [
 				{
+					key: projectId,
 					value: JSON.stringify({
 						key: MESSAGE_KEYS.PROJECT_FAILED,
-						projectId,
 						error: "package.json not found",
 					}),
 				},
@@ -49,9 +49,9 @@ export const serveTheProject = async (
 			topic: TOPIC.SERVING_TO_ORCHESTRATOR,
 			messages: [
 				{
+					key: projectId,
 					value: JSON.stringify({
 						key: MESSAGE_KEYS.PROJECT_FAILED,
-						projectId,
 						error: "No start script in package.json",
 					}),
 				},
@@ -88,6 +88,7 @@ export const serveTheProject = async (
 				topic: TOPIC.SERVING_TO_ORCHESTRATOR,
 				messages: [
 					{
+						key: projectId,
 						value: JSON.stringify({
 							key: MESSAGE_KEYS.PROJECT_RUN,
 							projectId,
@@ -100,9 +101,9 @@ export const serveTheProject = async (
 				topic: TOPIC.SERVING_TO_ORCHESTRATOR,
 				messages: [
 					{
+						key: projectId,
 						value: JSON.stringify({
 							key: MESSAGE_KEYS.PROJECT_FAILED,
-							projectId,
 							error: `Server process exited with code ${code}`,
 						}),
 					},

@@ -1,12 +1,9 @@
-import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import { getObject, listObjects } from "@elbavol/r2";
 import fs from "fs";
-import type { Producer } from "kafkajs";
 import path from "path";
 
 export const fetchFilesAndConfirmProject = async (
   projectId: string,
-  producer: Producer,
 ) => {
   console.log(`${process.env.SHARED_DIR}`);
   const bucketName = process.env.BUCKET_NAME || "elbavol";
@@ -48,11 +45,6 @@ export const fetchFilesAndConfirmProject = async (
         console.error(`Failed to download ${obj.Key}:`, error);
       }
     }
-
-    await producer.send({
-      topic: TOPIC.SERVING_TO_ORCHESTRATOR,
-      messages: [{ key: projectId, value: MESSAGE_KEYS.PROJECT_CREATED }],
-    });
 
     console.log(
       `Successfully fetched files and confirmed project ${projectId}`,

@@ -1,7 +1,7 @@
 import { GROUP_ID, MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import "dotenv/config";
 import { Kafka } from "kafkajs";
-import { pushProjectInitializationToServingPod } from "./classes/project";
+import { pushProjectInitializationToServingPod, waitForProjectInitializationConfirmation } from "./classes/project";
 import { listObjects, getObject } from "@elbavol/r2";
 import fs from "fs";
 import path from "path";
@@ -62,6 +62,15 @@ async function connectConsumer() {
 	}
 }
 
+async function connectConsumerControlFromServe() {
+	try {
+		await consumerControlFromServe.connect();
+		console.log("Kafka Consumer Control From Serve connected.");
+	} catch (error) {
+		console.error("Failed to connect Kafka Consumer Control From Serve:", error);
+	}
+}
+
 async function disconnectProducer() {
 	try {
 		await producer.disconnect();
@@ -77,6 +86,15 @@ async function disconnectConsumer() {
 		console.log("Kafka Consumer disconnected.");
 	} catch (error) {
 		console.error("Failed to disconnect Kafka Consumer:", error);
+	}
+}
+
+async function disconnectConsumerControlFromServe() {
+	try {
+		await consumerControlFromServe.disconnect();
+		console.log("Kafka Consumer Control From Serve disconnected.");
+	} catch (error) {
+		console.error("Failed to disconnect Kafka Consumer Control From Serve:", error);
 	}
 }
 
@@ -129,36 +147,26 @@ async function pullTemplateFromR2RenameItAsProject(projectId: string = ProjectId
 			}
 		}
 
-		const newObject = {
-			projectId,
-			bucketName,
-			timestamp: new Date().toISOString(),
-			filesCount: Contents.length,
-		};
-
-		await producer.send({
-			topic: TOPIC.CONTROL_TO_SERVING,
-			messages: [{ key: projectId, value: JSON.stringify(newObject) }],
-		}); // push build again
-
-		return {
-			success: true,
-			message: `Successfully pulled template code for project ${projectId}`,
-			projectId,
-			bucketName,
-			filesDownloaded: Contents.length,
-			newObject,
-		};
+		// return {
+		// 	success: true,
+		// 	message: `Successfully pulled template code for project ${projectId}`,
+		// 	projectId,
+		// 	filesCount: Contents.length,
+		// 	timestamp: new Date().toISOString(),
+		// };
+		return true;
 	} catch (error) {
 		console.error("Error in  pull code from bucket:", error);
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		return {
-			success: false,
-			message: `Failed to pull code for project ${projectId}: ${errorMessage}`,
-			projectId,
-			bucketName,
-			error: errorMessage,
-		};
+		console.log(errorMessage);
+
+		// return {
+		// 	success: false,
+		// 	message: `Failed to pull code for project ${projectId}: ${errorMessage}`,
+		// 	projectId,
+		// 	error: errorMessage,
+		// };
+		return false;
 	}
 }
 
@@ -166,7 +174,8 @@ async function start() {
 	console.log("Control POD is running...");
 	await connectProducer();
 	await connectConsumer();
-	// await pullTemplateFromR2RenameItAsProject();
+	// await pullTemplateFromR2RenameItAsProject(); // this just pull code on start in prod
+	await connectConsumerControlFromServe();
 
 	await consumer.subscribe({
 		topic: TOPIC.ORCHESTRATOR_TO_CONTROL,
@@ -186,6 +195,7 @@ async function start() {
 					console.log(`Initializing project ${projectId}`);
 					await pullTemplateFromR2RenameItAsProject(projectId); // need to remove in prod
 					await pushProjectInitializationToServingPod(projectId, producer);
+					await waitForProjectInitializationConfirmation(projectId); //round-triping
 					break;
 
 				case MESSAGE_KEYS.PROJECT_BUILD:
@@ -242,6 +252,7 @@ async function start() {
 		console.log("Received SIGINT. Shutting down...");
 		await disconnectConsumer();
 		await disconnectProducer();
+		await disconnectConsumerControlFromServe();
 		process.exit(0);
 	});
 
@@ -249,6 +260,7 @@ async function start() {
 		console.log("Received SIGTERM. Shutting down...");
 		await disconnectConsumer();
 		await disconnectProducer();
+		await disconnectConsumerControlFromServe();
 		process.exit(0);
 	});
 }

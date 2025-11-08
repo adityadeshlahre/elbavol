@@ -35,7 +35,7 @@ export const consumerServeFromControl = kafka.consumer({
 	groupId: GROUP_ID.SERVING_TO_CONTROL,
 });
 
-async function connectConsumerBetweenPods() {
+async function connectConsumerServeFromControl() {
 	try {
 		await consumerServeFromControl.connect();
 		console.log("Kafka Consumer Between Pods connected.");
@@ -44,7 +44,7 @@ async function connectConsumerBetweenPods() {
 	}
 }
 
-async function disconnectConsumerBetweenPods() {
+async function disconnectConsumerServeFromControl() {
 	try {
 		await consumerServeFromControl.disconnect();
 		console.log("Kafka Consumer Between Pods disconnected.");
@@ -93,7 +93,7 @@ async function start() {
 	console.log("Serving POD is running...");
 	await connectProducer();
 	await connectConsumer();
-	await connectConsumerBetweenPods();
+	await connectConsumerServeFromControl();
 
 	await consumerServeFromControl.subscribe({
 		topic: TOPIC.CONTROL_TO_SERVING,
@@ -105,23 +105,27 @@ async function start() {
 			console.log(JSON.stringify(message));
 			const projectId = message.key?.toString();
 			const value = message.value?.toString();
+
 			switch (value) {
 				case MESSAGE_KEYS.SERVE_PROJECT_INITIALIZED:
 					if (projectId) {
 						console.log(`Fetching files for project ${projectId}`);
-						await fetchFilesAndConfirmProject(projectId, producer);
+						await fetchFilesAndConfirmProject(projectId);
 						await producer.send({
 							topic: TOPIC.SERVING_TO_CONTROL,
-							messages: [
-								{
-									key: projectId,
-									value: JSON.stringify({
-										key: MESSAGE_KEYS.SERVE_PROJECT_INITIALIZATION_CONFIRMED,
-										success: true,
-										payload: JSON.stringify({ productId: projectId }),
-									}),
-								},
-							],
+							messages: [{
+								key: projectId,
+								value: JSON.stringify({
+									key: MESSAGE_KEYS.SERVE_PROJECT_INITIALIZATION_CONFIRMED,
+									success: true,
+									payload: JSON.stringify({ productId: projectId }),
+								}),
+
+							},],
+						});
+						await producer.send({
+							topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+							messages: [{ key: projectId, value: MESSAGE_KEYS.PROJECT_CREATED }],
 						});
 					}
 					break;
@@ -142,9 +146,31 @@ async function start() {
 		},
 	});
 
+	await consumer.subscribe({
+		topic: TOPIC.ORCHESTRATOR_TO_SERVING,
+		fromBeginning: true,
+	});
+
+	await consumer.run({
+		eachMessage: async ({ message }) => {
+			console.log(JSON.stringify(message));
+			const projectId = message.key?.toString();
+			const value = message.value?.toString();
+
+			if (!projectId || !value) return;
+
+			switch (value) {
+
+				default:
+					console.log(`Received unknown message: ${value} for project: ${projectId}`);
+					break;
+			}
+		},
+	});
+
 	process.on("SIGINT", async () => {
 		console.log("Received SIGINT. Shutting down...");
-		await disconnectConsumerBetweenPods();
+		await disconnectConsumerServeFromControl();
 		await disconnectConsumer();
 		await disconnectProducer();
 		process.exit(0);
@@ -152,7 +178,7 @@ async function start() {
 
 	process.on("SIGTERM", async () => {
 		console.log("Received SIGTERM. Shutting down...");
-		await disconnectConsumerBetweenPods();
+		await disconnectConsumerServeFromControl();
 		await disconnectConsumer();
 		await disconnectProducer();
 		process.exit(0);

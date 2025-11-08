@@ -19,8 +19,6 @@ var KafkaSenderClientToControl *kafkaShared.KafkaClientWriter
 var KafkaReceiverClientFromServing *kafkaShared.KafkaClientReader
 var KafkaSenderClientToServing *kafkaShared.KafkaClientWriter
 
-var KafkaClientBetweenPods *sharedTypes.KafkaClient
-
 var K8sClient *kubernetes.Clientset
 
 func main() {
@@ -42,7 +40,6 @@ func main() {
 		sharedTypes.ORCHESTRATOR_TO_SERVING,
 		sharedTypes.ORCHESTRATOR_GROUP_ID,
 	)
-	KafkaClientBetweenPods = shared.NewClient(sharedTypes.POD_TOPIC, sharedTypes.POD_GROUP_ID)
 	K8sClient = k8sShared.CreateK8sClient()
 
 	// Start consumer from backend
@@ -65,8 +62,73 @@ func main() {
 					KafkaReceiverClientFromServing,
 					KafkaSenderClientToBackend,
 				)
+			case sharedTypes.DELETE_PROJECT:
+				handlers.DeleteProjectHandler(
+					projectId,
+					K8sClient,
+					// KafkaSenderClientToControl,
+					// KafkaReceiverClientFromServing,
+					KafkaSenderClientToBackend,
+				)
 			default:
 				log.Printf("Unknown request type: %s", request)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			msg, err := KafkaReceiverClientFromControl.Reader.ReadMessage(context.Background())
+			if err != nil {
+				log.Printf("Error reading message from control pod: %v", err)
+				continue
+			}
+			projectId := string(msg.Key)
+			response := string(msg.Value)
+
+			switch response {
+			case sharedTypes.PROJECT_INITIALIZED:
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_INITIALIZED))
+				if err != nil {
+					log.Printf("Failed to send PROJECT_INITIALIZED message to backend for project %s: %v", projectId, err)
+				}
+			default:
+				log.Printf("Unknown response from control pod: %s", response)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			msg, err := KafkaReceiverClientFromServing.Reader.ReadMessage(context.Background())
+			if err != nil {
+				log.Printf("Error reading message from serving pod: %v", err)
+				continue
+			}
+			projectId := string(msg.Key)
+			response := string(msg.Value)
+
+			switch response {
+
+			case sharedTypes.PROJECT_CREATED:
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_CREATED))
+				if err != nil {
+					log.Printf("Failed to send PROJECT_CREATED message to backend for project %s: %v", projectId, err)
+				}
+
+			case sharedTypes.PROJECT_FAILED:
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_FAILED))
+				if err != nil {
+					log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", projectId, err)
+				}
+
+			case sharedTypes.PROJECT_RUN:
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
+				if err != nil {
+					log.Printf("Failed to send PROJECT_RUN message to backend for project %s: %v", projectId, err)
+				}
+			default:
+				log.Printf("Unknown response from serving pod: %s", response)
 			}
 		}
 	}()
