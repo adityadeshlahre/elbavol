@@ -1,5 +1,5 @@
 import type { AgentState, ProjectContext, ToolExecution } from "@elbavol/types";
-import { BaseMessage, HumanMessage } from "@langchain/core/messages";
+import { type BaseMessage, HumanMessage } from "@langchain/core/messages";
 
 class StateManager {
   private states: Map<string, AgentState> = new Map();
@@ -12,9 +12,9 @@ class StateManager {
       context: this.createEmptyContext(),
       toolExecutions: [],
       iteration: 0,
-      status: "idle"
+      status: "idle",
     };
-    
+
     this.states.set(projectId, initialState);
     return initialState;
   }
@@ -80,8 +80,8 @@ class StateManager {
       metadata: {
         lastModified: new Date().toISOString(),
         totalFiles: 0,
-        buildStatus: "pending"
-      }
+        buildStatus: "pending",
+      },
     };
   }
 

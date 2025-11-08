@@ -1,5 +1,11 @@
 export interface PromptAnalysis {
-  intent: "creation" | "debugging" | "modification" | "validation" | "information" | "general";
+  intent:
+    | "creation"
+    | "debugging"
+    | "modification"
+    | "validation"
+    | "information"
+    | "general";
   complexity: "low" | "medium" | "high";
   requiredTools: string[];
   actionPlan: string[];

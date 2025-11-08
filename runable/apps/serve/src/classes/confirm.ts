@@ -2,12 +2,13 @@ import { getObject, listObjects } from "@elbavol/r2";
 import fs from "fs";
 import path from "path";
 
-export const fetchFilesAndConfirmProject = async (
-  projectId: string,
-) => {
+export const fetchFilesAndConfirmProject = async (projectId: string) => {
   console.log(`${process.env.SHARED_DIR}`);
   const bucketName = process.env.BUCKET_NAME || "elbavol";
-  const dir = path.join(`${process.env.SHARED_DIR}` || "/app/shared", projectId);
+  const dir = path.join(
+    `${process.env.SHARED_DIR}` || "/app/shared",
+    projectId,
+  );
   fs.mkdirSync(dir, { recursive: true });
 
   try {

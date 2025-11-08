@@ -1,27 +1,27 @@
-import type { AgentState, WorkflowConfig, AgentResponse } from "@elbavol/types";
-import { stateManager } from "../state/manager";
-import { agent } from "../graphs/main";
+import type { AgentResponse, AgentState, WorkflowConfig } from "@elbavol/types";
 import { HumanMessage } from "@langchain/core/messages";
 import { SYSTEM_PROMPTS } from "../../prompt/systemPrompt";
+import { agent } from "../graphs/main";
+import { stateManager } from "../state/manager";
 
 class WorkflowEngine {
   private defaultConfig: WorkflowConfig = {
     maxIterations: 10,
     timeoutMs: 300000,
     enableValidation: true,
-    enableContextSaving: true
+    enableContextSaving: true,
   };
 
   async executePrompt(
     projectId: string,
     prompt: string,
-    config: Partial<WorkflowConfig> = {}
+    config: Partial<WorkflowConfig> = {},
   ): Promise<AgentResponse> {
     const finalConfig = { ...this.defaultConfig, ...config };
-    
+
     try {
       let state = stateManager.getState(projectId);
-      
+
       if (!state) {
         state = stateManager.initializeState(projectId, prompt);
       } else {
@@ -32,9 +32,9 @@ class WorkflowEngine {
       stateManager.setStatus(projectId, "thinking");
 
       const result = await this.runAgentWorkflow(state, finalConfig);
-      
+
       stateManager.setStatus(projectId, result.success ? "completed" : "error");
-      
+
       return result;
     } catch (error) {
       stateManager.setStatus(projectId, "error");
@@ -43,18 +43,18 @@ class WorkflowEngine {
         result: "",
         state: stateManager.getState(projectId)!,
         error: error instanceof Error ? error.message : String(error),
-        iterations: 0
+        iterations: 0,
       };
     }
   }
 
   private async runAgentWorkflow(
     initialState: AgentState,
-    config: WorkflowConfig
+    config: WorkflowConfig,
   ): Promise<AgentResponse> {
     const { projectId } = initialState;
     let iteration = 0;
-    
+
     while (iteration < config.maxIterations) {
       iteration = stateManager.incrementIteration(projectId);
       stateManager.setStatus(projectId, "executing");
@@ -62,45 +62,47 @@ class WorkflowEngine {
       try {
         const currentState = stateManager.getState(projectId)!;
         const systemPrompt = this.buildSystemPrompt(currentState);
-        
+
         const messages = [
           new HumanMessage(systemPrompt),
-          ...currentState.messages
+          ...currentState.messages,
         ];
 
-        const response = await agent.invoke({
-          messages
-        }, {
-          configurable: { thread_id: projectId }
-        });
+        const response = await agent.invoke(
+          {
+            messages,
+          },
+          {
+            configurable: { thread_id: projectId },
+          },
+        );
 
         if (response.messages && response.messages.length > 0) {
           const lastMessage = response.messages[response.messages.length - 1];
           if (lastMessage) {
             stateManager.addMessage(projectId, lastMessage);
-            
+
             const messageContent = lastMessage.content as string;
-            
+
             if (this.isWorkComplete(messageContent)) {
               return {
                 success: true,
                 result: messageContent,
                 state: stateManager.getState(projectId)!,
-                iterations: iteration
+                iterations: iteration,
               };
             }
           }
         }
 
         await this.delay(1000);
-
       } catch (error) {
         return {
           success: false,
           result: "",
           state: stateManager.getState(projectId)!,
           error: error instanceof Error ? error.message : String(error),
-          iterations: iteration
+          iterations: iteration,
         };
       }
     }
@@ -110,14 +112,14 @@ class WorkflowEngine {
       result: "Maximum iterations reached without completion",
       state: stateManager.getState(projectId)!,
       error: "Timeout: Maximum iterations exceeded",
-      iterations: iteration
+      iterations: iteration,
     };
   }
 
   private buildSystemPrompt(state: AgentState): string {
     const basePrompt = SYSTEM_PROMPTS.PROJECT_INITIALIZE_PROMPT;
     const contextInfo = this.buildContextInfo(state);
-    
+
     return `${basePrompt}
 
 CURRENT PROJECT CONTEXT:
@@ -147,17 +149,17 @@ Previous Tool Executions: ${state.toolExecutions.length}
       "work is done",
       "successfully created",
       "application is ready",
-      "build successful"
+      "build successful",
     ];
-    
+
     const lowerContent = content.toLowerCase();
-    return completionIndicators.some(indicator => 
-      lowerContent.includes(indicator)
+    return completionIndicators.some((indicator) =>
+      lowerContent.includes(indicator),
     );
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async getProjectStatus(projectId: string): Promise<AgentState | null> {

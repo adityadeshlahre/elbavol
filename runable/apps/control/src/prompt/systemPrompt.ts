@@ -1,4 +1,4 @@
- export const SYSTEM_PROMPTS = {
+export const SYSTEM_PROMPTS = {
   PROJECT_INITIALIZE_PROMPT: `
 You are an expert AI developer specializing in React with TypeScript. Your task is to build a complete React application based on the user's prompt using the provided template structure.
 

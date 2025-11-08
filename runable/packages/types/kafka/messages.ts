@@ -1,5 +1,11 @@
 export interface KafkaMessagePayload {
-  type: "AGENT_COMPLETED" | "AGENT_FAILED" | "AGENT_ERROR" | "PROJECT_INITIALIZED" | "SERVE_PROJECT_INITIALIZED" | "PROJECT_BUILD";
+  type:
+    | "AGENT_COMPLETED"
+    | "AGENT_FAILED"
+    | "AGENT_ERROR"
+    | "PROJECT_INITIALIZED"
+    | "SERVING_PROJECT_INITIALIZED"
+    | "PROJECT_BUILD";
   projectId?: string;
   result?: string;
   error?: string;

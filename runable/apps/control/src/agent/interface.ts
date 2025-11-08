@@ -1,11 +1,11 @@
-import { agentHandler } from "./index";
 import type { Producer } from "kafkajs";
+import { agentHandler } from "./index";
 
 export class AgentInterface {
   async processUserPrompt(
     projectId: string,
     userPrompt: string,
-    producer: Producer
+    producer: Producer,
   ): Promise<{
     success: boolean;
     message: string;
@@ -17,7 +17,7 @@ export class AgentInterface {
         return {
           success: false,
           message: "Invalid project ID or prompt",
-          projectId: projectId || "unknown"
+          projectId: projectId || "unknown",
         };
       }
 
@@ -26,7 +26,7 @@ export class AgentInterface {
           success: false,
           message: "Agent is already processing for this project",
           projectId,
-          processingStarted: false
+          processingStarted: false,
         };
       }
 
@@ -36,14 +36,14 @@ export class AgentInterface {
         success: true,
         message: "Agent processing started",
         projectId,
-        processingStarted: true
+        processingStarted: true,
       };
-
     } catch (error) {
       return {
         success: false,
-        message: error instanceof Error ? error.message : "Unknown error occurred",
-        projectId: projectId || "unknown"
+        message:
+          error instanceof Error ? error.message : "Unknown error occurred",
+        projectId: projectId || "unknown",
       };
     }
   }
@@ -51,12 +51,12 @@ export class AgentInterface {
   async getProjectStatus(projectId: string) {
     try {
       const status = await agentHandler.getProjectStatus(projectId);
-      
+
       return {
         success: true,
         projectId,
         ...status,
-        summary: this.generateStatusSummary(status)
+        summary: this.generateStatusSummary(status),
       };
     } catch (error) {
       return {
@@ -64,7 +64,7 @@ export class AgentInterface {
         projectId,
         error: error instanceof Error ? error.message : "Unknown error",
         isProcessing: false,
-        hasState: false
+        hasState: false,
       };
     }
   }
@@ -72,17 +72,18 @@ export class AgentInterface {
   async resetProject(projectId: string) {
     try {
       await agentHandler.resetProject(projectId);
-      
+
       return {
         success: true,
         message: `Project ${projectId} reset successfully`,
-        projectId
+        projectId,
       };
     } catch (error) {
       return {
         success: false,
-        message: error instanceof Error ? error.message : "Failed to reset project",
-        projectId
+        message:
+          error instanceof Error ? error.message : "Failed to reset project",
+        projectId,
       };
     }
   }
