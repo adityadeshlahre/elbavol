@@ -2,7 +2,7 @@ import { getObject, listObjects } from "@elbavol/r2";
 import fs from "fs";
 import path from "path";
 
-export const fetchFilesAndConfirmProject = async (projectId: string) => {
+export const fetchFilesFromSharedDir = async (projectId: string) => { // use-less
   console.log(`${process.env.SHARED_DIR}`);
   const bucketName = process.env.BUCKET_NAME || "elbavol";
   const dir = path.join(
@@ -58,4 +58,14 @@ export const fetchFilesAndConfirmProject = async (projectId: string) => {
     );
     return false;
   }
+};
+
+
+export const checkIfProjectFilesExist = (projectId: string): boolean => {
+  const dir = path.join(
+    `${process.env.SHARED_DIR}` || "/app/shared",
+    projectId,
+  );
+
+  return fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
 };

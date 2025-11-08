@@ -39,7 +39,7 @@ export const pushFilesToR2 = tool(
     const { projectId, bucketName = "elbavol" } = pushCodeInput.parse(input);
 
     try {
-      const sharedDir = "/app/shared";
+      const sharedDir = process.env.SHARED_DIR || "/app/shared";
       const projectDir = path.join(sharedDir, projectId);
 
       if (!fs.existsSync(projectDir)) {

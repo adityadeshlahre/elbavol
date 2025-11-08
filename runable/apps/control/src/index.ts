@@ -191,7 +191,6 @@ async function start() {
 
   await consumer.subscribe({
     topic: TOPIC.ORCHESTRATOR_TO_CONTROL,
-    fromBeginning: true,
   });
 
   await consumer.run({
@@ -245,7 +244,6 @@ async function start() {
 
   await consumerControlFromServe.subscribe({
     topic: TOPIC.SERVING_TO_CONTROL,
-    fromBeginning: true,
   });
 
   await consumerControlFromServe.run({

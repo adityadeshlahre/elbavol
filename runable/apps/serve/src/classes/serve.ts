@@ -7,7 +7,8 @@ export const serveTheProject = async (
   projectId: string,
   producer: Producer,
 ) => {
-  const dir = path.join("/app/shared", projectId);
+  const sharedDir = process.env.SHARED_DIR || "/app/shared";
+  const dir = path.join(sharedDir, projectId);
 
   if (!fs.existsSync(dir)) {
     await producer.send({

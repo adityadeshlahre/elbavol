@@ -118,7 +118,7 @@ export class AgentHandler {
           messages: [
             {
               key: projectId,
-              value: MESSAGE_KEYS.PROJECT_BUILD,
+              value: JSON.stringify({ key: MESSAGE_KEYS.PROJECT_RUN }),
             },
           ],
         });

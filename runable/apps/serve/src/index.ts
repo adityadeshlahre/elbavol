@@ -1,7 +1,7 @@
 import { GROUP_ID, MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import "dotenv/config";
 import { Kafka } from "kafkajs";
-import { fetchFilesAndConfirmProject } from "./classes/confirm";
+import { checkIfProjectFilesExist } from "./classes/confirm";
 import { serveTheProject } from "./classes/serve";
 
 console.log("Servering POD started with env:", {
@@ -97,7 +97,6 @@ async function start() {
 
   await consumerServeFromControl.subscribe({
     topic: TOPIC.CONTROL_TO_SERVING,
-    fromBeginning: true,
   });
 
   await consumerServeFromControl.run({
@@ -105,12 +104,21 @@ async function start() {
       console.log(JSON.stringify(message));
       const projectId = message.key?.toString();
       const value = message.value?.toString();
-
-      switch (value) {
+      if (!value) return;
+      let parsed;
+      try {
+        parsed = JSON.parse(value);
+      } catch (error) {
+        console.log(
+          `Failed to parse message: ${value} for project: ${projectId} from CONTROL_TO_SERVING`,
+        );
+        return;
+      }
+      switch (parsed.key) {
         case MESSAGE_KEYS.SERVING_PROJECT_INITIALIZED:
           if (projectId) {
-            console.log(`Fetching files for project ${projectId}`);
-            await fetchFilesAndConfirmProject(projectId);
+            console.log(`Confirming project ${projectId} is present`);
+            if (!checkIfProjectFilesExist(projectId)) return;
             await producer.send({
               topic: TOPIC.SERVING_TO_CONTROL,
               messages: [
@@ -119,7 +127,7 @@ async function start() {
                   value: JSON.stringify({
                     key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZATION_CONFIRMED,
                     success: true,
-                    payload: JSON.stringify({ productId: projectId }),
+                    payload: JSON.stringify({ projectId: projectId }),
                   }),
                 },
               ],
@@ -135,6 +143,8 @@ async function start() {
 
         case MESSAGE_KEYS.PROJECT_RUN:
           if (projectId) {
+            console.log(`Fetching and serving project ${projectId}`);
+            if (!checkIfProjectFilesExist(projectId)) return;
             await serveTheProject(projectId, producer);
             console.log(`Project ${projectId} is now running.`);
             projectRunning = true;
@@ -151,7 +161,6 @@ async function start() {
 
   await consumer.subscribe({
     topic: TOPIC.ORCHESTRATOR_TO_SERVING,
-    fromBeginning: true,
   });
 
   await consumer.run({

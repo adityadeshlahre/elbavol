@@ -10,7 +10,10 @@ export const pushProjectInitializationToServingPod = async (
     await producer.send({
       topic: TOPIC.CONTROL_TO_SERVING,
       messages: [
-        { key: projectId, value: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZED },
+        {
+          key: projectId,
+          value: JSON.stringify({ key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZED }),
+        },
       ],
     });
   } catch (error) {
@@ -24,7 +27,7 @@ export const pushProjectInitializationToServingPod = async (
 
 export const waitForProjectInitializationConfirmation = async (
   projectId: string,
-): Promise<{ productId: string }> => {
+): Promise<{ projectId: string }> => {
   return new Promise((resolve, reject) => {
     processing.set(
       projectId,
@@ -32,7 +35,7 @@ export const waitForProjectInitializationConfirmation = async (
         if (value.success && value.payload) {
           try {
             const payload = JSON.parse(value.payload);
-            resolve({ productId: payload.productId });
+            resolve({ projectId: payload.projectId });
           } catch (error) {
             reject(error);
           }
