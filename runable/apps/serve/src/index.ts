@@ -31,14 +31,16 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({ 
   groupId: `${GROUP_ID.SERVING_POD}-${Date.now()}`,
-  sessionTimeout: 30000,
-  heartbeatInterval: 3000,
+  sessionTimeout: 10000,
+  heartbeatInterval: 1000,
+  maxWaitTimeInMs: 100,
 });
 
 export const consumerServeFromControl = kafka.consumer({
   groupId: `${GROUP_ID.SERVING_TO_CONTROL}-${Date.now()}`,
-  sessionTimeout: 30000,
-  heartbeatInterval: 3000,
+  sessionTimeout: 10000,
+  heartbeatInterval: 1000,
+  maxWaitTimeInMs: 100,
 });
 
 async function connectConsumerServeFromControl() {
@@ -164,20 +166,19 @@ async function start() {
               const errorMessage = error instanceof Error ? error.message : String(error);
               
               try {
-              await producer.send({
-                topic: TOPIC.SERVING_TO_CONTROL,
-                messages: [
-                  {
-                    key: projectId,
-                    value: JSON.stringify({
-                      key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZATION_CONFIRMED,
-                      success: false,
-                      payload: JSON.stringify({ error: errorMessage }),
-                    }),
-                  },
-                ],
-              }); // this vage i think
-
+                await producer.send({
+                  topic: TOPIC.SERVING_TO_CONTROL,
+                  messages: [
+                    {
+                      key: projectId,
+                      value: JSON.stringify({
+                        key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZATION_CONFIRMED,
+                        success: false,
+                        payload: JSON.stringify({ error: errorMessage }),
+                      }),
+                    },
+                  ],
+                }); // this is vage i think
                 await producer.send({
                   topic: TOPIC.SERVING_TO_ORCHESTRATOR,
                   messages: [

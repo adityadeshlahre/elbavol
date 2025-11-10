@@ -58,12 +58,14 @@ func CreateProjectHandler(c echo.Context) error {
 		log.Printf("Received response for project %s: %s", id, response)
 		
 		if response == sharedTypes.PROJECT_CREATED {
-			file, err := os.Create("/tmp/" + id + ".txt")
-			if err != nil {
-				log.Printf("Error creating file for project %s: %v", id, err)
-				return c.String(500, "Project created but failed to create local file")
-			}
-			defer file.Close()
+			go func() {
+				if file, err := os.Create("/tmp/" + id + ".txt"); err != nil {
+					log.Printf("Error creating file for project %s: %v", id, err)
+				} else {
+					file.Close()
+					log.Printf("Created project file for %s", id)
+				}
+			}()
 			
 			log.Printf("Successfully created project %s", id)
 			return c.String(200, id)

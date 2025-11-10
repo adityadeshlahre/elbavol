@@ -43,14 +43,16 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({ 
   groupId: `${GROUP_ID.CONTROL_POD}-${Date.now()}`,
-  sessionTimeout: 30000,
-  heartbeatInterval: 3000,
+  sessionTimeout: 10000,
+  heartbeatInterval: 1000,
+  maxWaitTimeInMs: 100,
 });
 
 export const consumerControlFromServe = kafka.consumer({
   groupId: `${GROUP_ID.CONTROL_TO_SERVING}-${Date.now()}`,
-  sessionTimeout: 30000,
-  heartbeatInterval: 3000,
+  sessionTimeout: 10000,
+  heartbeatInterval: 1000,
+  maxWaitTimeInMs: 100,
 });
 
 async function connectProducer() {

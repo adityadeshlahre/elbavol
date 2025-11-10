@@ -32,7 +32,7 @@ export const waitForProjectInitializationConfirmation = async (
     const timeout = setTimeout(() => {
       processing.delete(projectId);
       reject(new Error(`Timeout waiting for project initialization confirmation for ${projectId}`));
-    }, 30000);
+    }, 5000);
 
     processing.set(
       projectId,
