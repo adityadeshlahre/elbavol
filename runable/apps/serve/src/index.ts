@@ -29,18 +29,18 @@ const kafka = new Kafka(kafkaConfig);
 
 export const producer = kafka.producer();
 
-export const consumer = kafka.consumer({ 
+export const consumer = kafka.consumer({
   groupId: `${GROUP_ID.SERVING_POD}-${Date.now()}`,
   sessionTimeout: 10000,
   heartbeatInterval: 1000,
-  maxWaitTimeInMs: 100,
+  maxWaitTimeInMs: 500,
 });
 
 export const consumerServeFromControl = kafka.consumer({
   groupId: `${GROUP_ID.SERVING_TO_CONTROL}-${Date.now()}`,
   sessionTimeout: 10000,
   heartbeatInterval: 1000,
-  maxWaitTimeInMs: 100,
+  maxWaitTimeInMs: 500,
 });
 
 async function connectConsumerServeFromControl() {
@@ -111,10 +111,13 @@ async function start() {
   await consumerServeFromControl.run({
     partitionsConsumedConcurrently: 1, // Process messages sequentially
     eachMessage: async ({ message, partition, topic }) => {
-      console.log(`[SERVE] Received message from topic: ${topic}, partition: ${partition}`, JSON.stringify(message));
+      console.log(
+        `[SERVE] Received message from topic: ${topic}, partition: ${partition}`,
+        JSON.stringify(message),
+      );
       const projectId = message.key?.toString();
       const value = message.value?.toString();
-      
+
       if (!value || !projectId) {
         console.log("Skipping message: missing projectId or value");
         return;
@@ -128,16 +131,23 @@ async function start() {
         );
         return;
       }
-      console.log(`[SERVE] Processing message for project ${projectId}:`, parsed.key);
+      console.log(
+        `[SERVE] Processing message for project ${projectId}:`,
+        parsed.key,
+      );
 
       switch (parsed.key) {
         case MESSAGE_KEYS.SERVING_PROJECT_INITIALIZED:
           if (projectId) {
-            console.log(`[${new Date().toISOString()}] [SERVE] Confirming project ${projectId} initialization`);
+            console.log(
+              `[${new Date().toISOString()}] [SERVE] Confirming project ${projectId} initialization`,
+            );
             try {
               // if (!checkIfProjectFilesExist(projectId)) return;
 
-              console.log(`[SERVE] Sending confirmation back to control pod for ${projectId}`);
+              console.log(
+                `[SERVE] Sending confirmation back to control pod for ${projectId}`,
+              );
               await producer.send({
                 topic: TOPIC.SERVING_TO_CONTROL,
                 messages: [
@@ -152,7 +162,9 @@ async function start() {
                 ],
               });
 
-              console.log(`[SERVE] Sending PROJECT_CREATED to orchestrator for ${projectId}`);
+              console.log(
+                `[SERVE] Sending PROJECT_CREATED to orchestrator for ${projectId}`,
+              );
               await producer.send({
                 topic: TOPIC.SERVING_TO_ORCHESTRATOR,
                 messages: [
@@ -160,11 +172,17 @@ async function start() {
                 ],
               });
 
-              console.log(`[${new Date().toISOString()}] [SERVE] Successfully confirmed project initialization for ${projectId}`);
+              console.log(
+                `[${new Date().toISOString()}] [SERVE] Successfully confirmed project initialization for ${projectId}`,
+              );
             } catch (error) {
-              console.error(`[SERVE] Failed to confirm project initialization for ${projectId}:`, error);
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              
+              console.error(
+                `[SERVE] Failed to confirm project initialization for ${projectId}:`,
+                error,
+              );
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
+
               try {
                 await producer.send({
                   topic: TOPIC.SERVING_TO_CONTROL,
@@ -186,7 +204,10 @@ async function start() {
                   ],
                 });
               } catch (sendError) {
-                console.error(`[SERVE] Failed to send error messages for ${projectId}:`, sendError);
+                console.error(
+                  `[SERVE] Failed to send error messages for ${projectId}:`,
+                  sendError,
+                );
               }
             }
           }
