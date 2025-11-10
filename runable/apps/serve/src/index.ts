@@ -21,7 +21,7 @@ export const projectId = process.env.PROJECT_ID || "";
 export const bucketName = process.env.BUCKET_NAME || "";
 
 const kafkaConfig = {
-  clientId: "serve-pod",
+  clientId: `serve-pod-${Date.now()}`,
   brokers: (process.env.KAFKA_BROKERS || "localhost:9092").split(","),
 };
 
@@ -29,10 +29,16 @@ const kafka = new Kafka(kafkaConfig);
 
 export const producer = kafka.producer();
 
-export const consumer = kafka.consumer({ groupId: GROUP_ID.SERVING_POD });
+export const consumer = kafka.consumer({ 
+  groupId: `${GROUP_ID.SERVING_POD}-${Date.now()}`,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
+});
 
 export const consumerServeFromControl = kafka.consumer({
-  groupId: GROUP_ID.SERVING_TO_CONTROL,
+  groupId: `${GROUP_ID.SERVING_TO_CONTROL}-${Date.now()}`,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
 });
 
 async function connectConsumerServeFromControl() {
@@ -97,14 +103,20 @@ async function start() {
 
   await consumerServeFromControl.subscribe({
     topic: TOPIC.CONTROL_TO_SERVING,
+    fromBeginning: true,
   });
 
   await consumerServeFromControl.run({
-    eachMessage: async ({ message }) => {
-      console.log(JSON.stringify(message));
+    partitionsConsumedConcurrently: 1, // Process messages sequentially
+    eachMessage: async ({ message, partition, topic }) => {
+      console.log(`[SERVE] Received message from topic: ${topic}, partition: ${partition}`, JSON.stringify(message));
       const projectId = message.key?.toString();
       const value = message.value?.toString();
-      if (!value) return;
+      
+      if (!value || !projectId) {
+        console.log("Skipping message: missing projectId or value");
+        return;
+      }
       let parsed;
       try {
         parsed = JSON.parse(value);
@@ -114,30 +126,68 @@ async function start() {
         );
         return;
       }
+      console.log(`[SERVE] Processing message for project ${projectId}:`, parsed.key);
+
       switch (parsed.key) {
         case MESSAGE_KEYS.SERVING_PROJECT_INITIALIZED:
           if (projectId) {
-            console.log(`Confirming project ${projectId} is present`);
-            // if (!checkIfProjectFilesExist(projectId)) return;
-            await producer.send({
-              topic: TOPIC.SERVING_TO_CONTROL,
-              messages: [
-                {
-                  key: projectId,
-                  value: JSON.stringify({
-                    key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZATION_CONFIRMED,
-                    success: true,
-                    payload: JSON.stringify({ projectId: projectId }),
-                  }),
-                },
-              ],
-            });
-            await producer.send({
-              topic: TOPIC.SERVING_TO_ORCHESTRATOR,
-              messages: [
-                { key: projectId, value: MESSAGE_KEYS.PROJECT_CREATED },
-              ],
-            });
+            console.log(`[${new Date().toISOString()}] [SERVE] Confirming project ${projectId} initialization`);
+            try {
+              // if (!checkIfProjectFilesExist(projectId)) return;
+
+              console.log(`[SERVE] Sending confirmation back to control pod for ${projectId}`);
+              await producer.send({
+                topic: TOPIC.SERVING_TO_CONTROL,
+                messages: [
+                  {
+                    key: projectId,
+                    value: JSON.stringify({
+                      key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZATION_CONFIRMED,
+                      success: true,
+                      payload: JSON.stringify({ projectId: projectId }),
+                    }),
+                  },
+                ],
+              });
+
+              console.log(`[SERVE] Sending PROJECT_CREATED to orchestrator for ${projectId}`);
+              await producer.send({
+                topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+                messages: [
+                  { key: projectId, value: MESSAGE_KEYS.PROJECT_CREATED },
+                ],
+              });
+
+              console.log(`[${new Date().toISOString()}] [SERVE] Successfully confirmed project initialization for ${projectId}`);
+            } catch (error) {
+              console.error(`[SERVE] Failed to confirm project initialization for ${projectId}:`, error);
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              
+              try {
+              await producer.send({
+                topic: TOPIC.SERVING_TO_CONTROL,
+                messages: [
+                  {
+                    key: projectId,
+                    value: JSON.stringify({
+                      key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZATION_CONFIRMED,
+                      success: false,
+                      payload: JSON.stringify({ error: errorMessage }),
+                    }),
+                  },
+                ],
+              }); // this vage i think
+
+                await producer.send({
+                  topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+                  messages: [
+                    { key: projectId, value: MESSAGE_KEYS.PROJECT_FAILED },
+                  ],
+                });
+              } catch (sendError) {
+                console.error(`[SERVE] Failed to send error messages for ${projectId}:`, sendError);
+              }
+            }
           }
           break;
 

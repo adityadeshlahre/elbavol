@@ -1,8 +1,10 @@
 package shared
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/adityadeshlahre/elbavol/shared/kafka"
 	"github.com/adityadeshlahre/elbavol/shared/types"
@@ -24,7 +26,9 @@ func init() {
 }
 
 func NewReader(topic string, groupID string) *kafka.KafkaClientReader {
-	return kafka.NewKafkaClientReader(kafkaURL, topic, groupID)
+	uniqueGroupID := fmt.Sprintf("%s-%d", groupID, time.Now().UnixNano())
+	log.Printf("Creating Kafka reader with unique group ID: %s", uniqueGroupID)
+	return kafka.NewKafkaClientReader(kafkaURL, topic, uniqueGroupID)
 }
 
 func NewWriter(topic string, groupID string) *kafka.KafkaClientWriter {

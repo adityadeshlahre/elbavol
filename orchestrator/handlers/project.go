@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var ServeResponses = make(map[string]chan string)
+var ServerResponses = make(map[string]chan string)
 var ControlResponses = make(map[string]chan string)
 
 func CreateProjectHandler(
@@ -40,21 +40,16 @@ func CreateProjectHandler(
 	err := senderToControl.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_INITIALIZED))
 	if err != nil {
 		log.Printf("Error sending project initialized message to control pod for project %s: %v", projectId, err)
+		// Send failure message back to backend
+		senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_FAILED))
 		return
 	}
 
-	// Await confirmation from serving pod
-	ch := make(chan string, 1)
-	ServeResponses[projectId] = ch
-	response := <-ch
+	log.Printf("Sent PROJECT_INITIALIZED message to control pod for project %s", projectId)
 
-	if response == sharedTypes.PROJECT_CREATED {
-		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_CREATED))
-		if err != nil {
-			log.Printf("Error sending project created confirmation to backend: %v", err)
-		}
-		return
-	}
+	// The response will be handled by the serving message listener in main.go
+	// This prevents blocking and allows concurrent project creation
+	log.Printf("Project creation initiated for %s, waiting for serving pod confirmation", projectId)
 }
 
 func DeleteProjectHandler(projectId string,

@@ -33,7 +33,7 @@ export const processing = new Map<
 >();
 
 const kafkaConfig = {
-  clientId: "control-pod",
+  clientId: `control-pod-${Date.now()}`,
   brokers: (process.env.KAFKA_BROKERS || "localhost:9092").split(","),
 };
 
@@ -41,10 +41,16 @@ const kafka = new Kafka(kafkaConfig);
 
 export const producer = kafka.producer();
 
-export const consumer = kafka.consumer({ groupId: GROUP_ID.CONTROL_POD });
+export const consumer = kafka.consumer({ 
+  groupId: `${GROUP_ID.CONTROL_POD}-${Date.now()}`,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
+});
 
 export const consumerControlFromServe = kafka.consumer({
-  groupId: GROUP_ID.CONTROL_TO_SERVING,
+  groupId: `${GROUP_ID.CONTROL_TO_SERVING}-${Date.now()}`,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
 });
 
 async function connectProducer() {
@@ -191,22 +197,63 @@ async function start() {
 
   await consumer.subscribe({
     topic: TOPIC.ORCHESTRATOR_TO_CONTROL,
+    fromBeginning: true,
   });
 
   await consumer.run({
-    eachMessage: async ({ message }) => {
-      console.log(JSON.stringify(message));
+    partitionsConsumedConcurrently: 1,
+    eachMessage: async ({ message, partition, topic }) => {
+      console.log(`Received message from topic: ${topic}, partition: ${partition}`, JSON.stringify(message));
       const projectId = message.key?.toString();
       const value = message.value?.toString();
 
-      if (!projectId || !value) return;
+      if (!projectId || !value) {
+        console.log("Skipping message: missing projectId or value");
+        return;
+      }
+
+      console.log(`Processing message for project ${projectId}: ${value}`);
 
       switch (value) {
         case MESSAGE_KEYS.PROJECT_INITIALIZED:
-          console.log(`Initializing project ${projectId}`);
-          await pullTemplateFromR2RenameItAsProject(projectId); // need to remove in prod
-          await pushProjectInitializationToServingPod(projectId, producer);
-          await waitForProjectInitializationConfirmation(projectId); //round-triping
+          console.log(`[${new Date().toISOString()}] Initializing project ${projectId}`);
+          
+          if (processing.has(projectId)) {
+            console.log(`Project ${projectId} is already being processed, skipping`);
+            return;
+          }
+
+          try {
+            console.log(`[${projectId}] Step 1: Pulling template from R2`);
+            const templateResult = await pullTemplateFromR2RenameItAsProject(projectId);
+            if (!templateResult) {
+              throw new Error("Failed to pull template from R2");
+            }
+
+            console.log(`[${projectId}] Step 2: Pushing initialization to serving pod`);
+            await pushProjectInitializationToServingPod(projectId, producer);
+            
+            console.log(`[${projectId}] Step 3: Waiting for serving pod confirmation`);
+            await waitForProjectInitializationConfirmation(projectId);
+            
+            console.log(`[${new Date().toISOString()}] Successfully initialized project ${projectId}`);
+          } catch (error) {
+            console.error(`[${new Date().toISOString()}] Failed to initialize project ${projectId}:`, error);
+            
+            processing.delete(projectId);
+            
+            try {
+              await producer.send({
+                topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+                messages: [
+                  { key: projectId, value: MESSAGE_KEYS.PROJECT_FAILED },
+                ],
+              });
+              console.log(`Sent PROJECT_FAILED for ${projectId}`);
+            } catch (sendError) {
+              console.error(`Failed to send PROJECT_FAILED for ${projectId}:`, sendError);
+            }
+          }
           break;
 
         case MESSAGE_KEYS.PROJECT_BUILD: {

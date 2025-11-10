@@ -29,15 +29,23 @@ export const waitForProjectInitializationConfirmation = async (
   projectId: string,
 ): Promise<{ projectId: string }> => {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      processing.delete(projectId);
+      reject(new Error(`Timeout waiting for project initialization confirmation for ${projectId}`));
+    }, 30000);
+
     processing.set(
       projectId,
       (value: { success: boolean; payload?: string | undefined }) => {
+        clearTimeout(timeout);
+        processing.delete(projectId);
+        
         if (value.success && value.payload) {
           try {
             const payload = JSON.parse(value.payload);
             resolve({ projectId: payload.projectId });
           } catch (error) {
-            reject(error);
+            reject(new Error(`Failed to parse confirmation payload for project ${projectId}: ${error}`));
           }
         } else {
           reject(

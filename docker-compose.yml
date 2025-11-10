@@ -7,6 +7,8 @@ services:
         - linux/amd64
     image: elbavol-control:latest
     container_name: elbavol-control
+    environment:
+      KAFKAJS_NO_PARTITIONER_WARNING: 1
 
   serve:
     build:
@@ -16,6 +18,8 @@ services:
         - linux/amd64
     image: elbavol-serve:latest
     container_name: elbavol-serve
+    environment:
+      KAFKAJS_NO_PARTITIONER_WARNING: 1
 
   ingress:
     build:
