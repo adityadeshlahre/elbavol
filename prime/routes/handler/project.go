@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"log"
 	"os"
 
@@ -38,27 +37,23 @@ func CreateProjectHandler(c echo.Context) error {
 	}
 
 	// Await response
-	ctx := context.Background()
-	for {
-		msg, err := clients.KafkaReceiverClientFromOrchestrator.Reader.ReadMessage(ctx)
-		if err != nil {
-			log.Printf("Error reading message: %v", err)
-			return c.String(500, "Failed to read response")
-		}
-		projectId := string(msg.Key)
-		response := string(msg.Value)
+	responses := c.Get("responses").(map[string]chan string)
+	ch := make(chan string, 1)
+	responses[id] = ch
+	response := <-ch
 
-		file, err := os.Create("/tmp/" + id + ".txt")
-		if err != nil {
-			log.Printf("Error creating file for project %s: %v", id, err)
-			return c.String(500, "Failed to create project file")
-		}
-		defer file.Close()
-
-		if projectId == id && response == sharedTypes.PROJECT_CREATED {
-			return c.String(200, projectId)
-		}
+	file, err := os.Create("/tmp/" + id + ".txt")
+	if err != nil {
+		log.Printf("Error creating file for project %s: %v", id, err)
+		return c.String(500, "Failed to create project file")
 	}
+	defer file.Close()
+
+	if response == sharedTypes.PROJECT_CREATED {
+		return c.String(200, id)
+	}
+
+	return c.String(500, "Unexpected response")
 }
 
 func DeleteProjectHandler(c echo.Context) error {
@@ -69,24 +64,20 @@ func DeleteProjectHandler(c echo.Context) error {
 		return c.String(500, "Failed to send delete message")
 	}
 
-	ctx := context.Background()
-	for {
-		msg, err := clients.KafkaReceiverClientFromOrchestrator.Reader.ReadMessage(ctx)
-		if err != nil {
-			log.Printf("Error reading message: %v", err)
-			return c.String(500, "Failed to read response")
-		}
-		ProjectId := string(msg.Key)
-		response := string(msg.Value)
+	responses := c.Get("responses").(map[string]chan string)
+	ch := make(chan string, 1)
+	responses[projectId] = ch
+	response := <-ch
 
-		err = os.Remove("/tmp/" + ProjectId + ".txt")
-		if err != nil {
-			log.Printf("Error deleting file for project %s: %v", projectId, err)
-			return c.String(500, "Failed to delete project file")
-		}
-
-		if projectId == ProjectId && response == sharedTypes.PROJECT_DELETED {
-			return c.String(200, "Project deleted successfully")
-		}
+	err = os.Remove("/tmp/" + projectId + ".txt")
+	if err != nil {
+		log.Printf("Error deleting file for project %s: %v", projectId, err)
+		return c.String(500, "Failed to delete project file")
 	}
+
+	if response == sharedTypes.PROJECT_DELETED {
+		return c.String(200, "Project deleted successfully")
+	}
+
+	return c.String(500, "Unexpected response")
 }

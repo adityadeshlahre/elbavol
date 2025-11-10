@@ -118,7 +118,7 @@ async function start() {
         case MESSAGE_KEYS.SERVING_PROJECT_INITIALIZED:
           if (projectId) {
             console.log(`Confirming project ${projectId} is present`);
-            if (!checkIfProjectFilesExist(projectId)) return;
+            // if (!checkIfProjectFilesExist(projectId)) return;
             await producer.send({
               topic: TOPIC.SERVING_TO_CONTROL,
               messages: [

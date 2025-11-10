@@ -1,15 +1,16 @@
 package handlers
 
 import (
-	"context"
 	"log"
-	"strings"
 
 	"github.com/adityadeshlahre/elbavol/orchestrator/k8s"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
 	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
 	"k8s.io/client-go/kubernetes"
 )
+
+var ServeResponses = make(map[string]chan string)
+var ControlResponses = make(map[string]chan string)
 
 func CreateProjectHandler(
 	projectId string,
@@ -43,25 +44,17 @@ func CreateProjectHandler(
 	}
 
 	// Await confirmation from serving pod
-	ctx := context.Background()
-	for {
-		msg, err := receiverFromServing.Reader.ReadMessage(ctx)
+	ch := make(chan string, 1)
+	ServeResponses[projectId] = ch
+	response := <-ch
+
+	if response == sharedTypes.PROJECT_CREATED {
+		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_CREATED))
 		if err != nil {
-			log.Printf("Error reading message from serving pod: %v", err)
-			continue
+			log.Printf("Error sending project created confirmation to backend: %v", err)
 		}
-		pId := string(msg.Key)
-		response := string(msg.Value)
-
-		if pId == projectId && response == sharedTypes.PROJECT_CREATED {
-			err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_CREATED))
-			if err != nil {
-				log.Printf("Error sending project created confirmation to backend: %v", err)
-			}
-			return
-		}
+		return
 	}
-
 }
 
 func DeleteProjectHandler(projectId string,
@@ -102,38 +95,19 @@ func ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubH
 	}
 
 	// Await response from control pod
-	ctx := context.Background()
-	for {
-		msg, err := recevingFromControl.Reader.ReadMessage(ctx)
-		if err != nil {
-			log.Printf("Error reading message from control pod: %v", err)
-			continue
-		}
-		responseId := string(msg.Key)
-		response := string(msg.Value)
+	ch := make(chan string, 1)
+	ControlResponses[projectId] = ch
+	payload := <-ch
 
-		sepIndex := strings.Index(response, "|")
-		if sepIndex == -1 {
-			log.Printf("Malformed response: %v", response)
-			continue
-		}
+	err = senderToBackend.WriteMessage(
+		[]byte(projectId),
+		[]byte(payload),
+	)
 
-		header := strings.TrimSpace(response[:sepIndex])
-		payload := strings.TrimSpace(response[sepIndex+1:])
-
-		if responseId == projectId && strings.Contains(header, sharedTypes.PROMPT_RESPONSE) {
-			err = senderToBackend.WriteMessage(
-				[]byte(projectId),
-				[]byte(payload),
-			)
-
-			if err != nil {
-				log.Printf("Failed to send LLM response to backend: %v", err)
-				return
-			}
-
-			log.Printf("Sent LLM response back to backend for project %s", projectId)
-			return
-		}
+	if err != nil {
+		log.Printf("Failed to send LLM response to backend: %v", err)
+		return
 	}
+
+	log.Printf("Sent LLM response back to backend for project %s", projectId)
 }
