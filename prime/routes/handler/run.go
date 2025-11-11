@@ -36,7 +36,36 @@ func RunHandler(c echo.Context) error {
 		log.Printf("Received build response for project %s: %s", projectId, response)
 		switch response {
 		case sharedTypes.PROJECT_BUILD_SUCCESS:
-			// Build successful, proceed to run phase
+			err = clients.KafkaSenderClientToOrchestrator.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
+			if err != nil {
+				return c.String(500, "failed to trigger run")
+			}
+
+			log.Printf("Triggered run for project %s", projectId)
+
+			ch = make(chan string, 1)
+			responseManager.SetChannel(projectId, ch)
+
+			select {
+			case response := <-ch:
+				log.Printf("Received run response for project %s: %s", projectId, response)
+				switch response {
+				case sharedTypes.PROJECT_RUN_SUCCESS:
+					return c.String(200, fmt.Sprintf("%s.localhost:3000", projectId))
+				case sharedTypes.PROJECT_RUN_FAILED:
+					log.Printf("Run failed for project %s", projectId)
+					return c.String(500, "run failed")
+				case sharedTypes.PROJECT_FAILED:
+					log.Printf("Run failed for project %s", projectId)
+					return c.String(500, "run failed")
+				default:
+					log.Printf("Unknown run response for project %s: %s", projectId, response)
+					return c.String(500, "unknown run response")
+				}
+			case <-c.Request().Context().Done():
+				log.Printf("Run request for project %s timed out", projectId)
+				return c.String(504, "run timed out")
+			}
 		case sharedTypes.PROJECT_BUILD_FAILED:
 			log.Printf("Build failed for project %s", projectId)
 			return c.String(500, "build failed")
@@ -47,33 +76,5 @@ func RunHandler(c echo.Context) error {
 	case <-c.Request().Context().Done():
 		log.Printf("Build request for project %s timed out", projectId)
 		return c.String(504, "build timed out")
-	}
-
-	err = clients.KafkaSenderClientToOrchestrator.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
-	if err != nil {
-		return c.String(500, "failed to trigger run")
-	}
-
-	log.Printf("Triggered run for project %s", projectId)
-
-	ch = make(chan string, 1)
-	responseManager.SetChannel(projectId, ch)
-
-	select {
-	case response := <-ch:
-		log.Printf("Received run response for project %s: %s", projectId, response)
-		switch response {
-		case sharedTypes.PROJECT_RUN_SUCCESS:
-			return c.String(200, fmt.Sprintf("%s.localhost:3000", projectId))
-		case sharedTypes.PROJECT_FAILED:
-			log.Printf("Run failed for project %s", projectId)
-			return c.String(500, "run failed")
-		default:
-			log.Printf("Unknown run response for project %s: %s", projectId, response)
-			return c.String(500, "unknown run response")
-		}
-	case <-c.Request().Context().Done():
-		log.Printf("Run request for project %s timed out", projectId)
-		return c.String(504, "run timed out")
 	}
 }
