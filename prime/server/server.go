@@ -15,6 +15,8 @@ func NewServer() *echo.Echo {
 
 	handler.SetProjectRouter(e)
 	handler.ProjectRoutes()
+	handler.SetChatRouter(e)
+	handler.ChatRoutes()
 
 	return e
 }

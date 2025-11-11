@@ -42,17 +42,11 @@ const kafka = new Kafka(kafkaConfig);
 export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({
-  groupId: `${GROUP_ID.CONTROL_POD}-${Date.now()}`,
-  sessionTimeout: 10000,
-  heartbeatInterval: 1000,
-  maxWaitTimeInMs: 500,
+  groupId: GROUP_ID.CONTROL_POD,
 });
 
 export const consumerControlFromServe = kafka.consumer({
-  groupId: `${GROUP_ID.CONTROL_TO_SERVING}-${Date.now()}`,
-  sessionTimeout: 10000,
-  heartbeatInterval: 1000,
-  maxWaitTimeInMs: 500,
+  groupId: GROUP_ID.CONTROL_TO_SERVING,
 });
 
 async function connectProducer() {
@@ -199,7 +193,6 @@ async function start() {
 
   await consumer.subscribe({
     topic: TOPIC.ORCHESTRATOR_TO_CONTROL,
-    fromBeginning: true,
   });
 
   await consumer.run({
@@ -290,8 +283,13 @@ async function start() {
         }
 
         default:
-          if (value.startsWith("PROMPT:")) {
-            const prompt = value.replace("PROMPT:", "").trim();
+          if (value.startsWith("PROMPT|")) {
+            const parts = value.split("|");
+            if (parts.length < 2 || !parts[1]) {
+              console.log(`Invalid prompt format for project ${projectId}: ${value}`);
+              break;
+            }
+            const prompt = parts[1].trim();
             console.log(
               `Processing prompt for project ${projectId}: ${prompt}`,
             );

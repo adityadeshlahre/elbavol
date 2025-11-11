@@ -34,16 +34,11 @@ export class AgentHandler {
         console.log(`Agent completed successfully for project ${projectId}`);
 
         await producer.send({
-          topic: TOPIC.SERVING_TO_CONTROL, // maybe wrong here
+          topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
           messages: [
             {
               key: projectId,
-              value: JSON.stringify({
-                type: "AGENT_COMPLETED",
-                result: response.result,
-                iterations: response.iterations,
-                timestamp: new Date().toISOString(),
-              }),
+              value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + response.result,
             },
           ],
         });
@@ -53,16 +48,11 @@ export class AgentHandler {
         console.error(`Agent failed for project ${projectId}:`, response.error);
 
         await producer.send({
-          topic: TOPIC.SERVING_TO_CONTROL, // maybe wrong here
+          topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
           messages: [
             {
               key: projectId,
-              value: JSON.stringify({
-                type: "AGENT_FAILED",
-                error: response.error,
-                iterations: response.iterations,
-                timestamp: new Date().toISOString(),
-              }),
+              value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + response.error,
             },
           ],
         });
@@ -71,15 +61,11 @@ export class AgentHandler {
       console.error(`Agent handler error for project ${projectId}:`, error);
 
       await producer.send({
-        topic: TOPIC.SERVING_TO_CONTROL, // maybe wrong here
+        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
         messages: [
           {
             key: projectId,
-            value: JSON.stringify({
-              type: "AGENT_ERROR",
-              error: error instanceof Error ? error.message : String(error),
-              timestamp: new Date().toISOString(),
-            }),
+            value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + (error instanceof Error ? error.message : String(error)),
           },
         ],
       });

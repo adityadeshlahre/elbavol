@@ -56,7 +56,7 @@ func CreateProjectHandler(c echo.Context) error {
 	select {
 	case response := <-ch:
 		log.Printf("Received response for project %s: %s", id, response)
-		
+
 		if response == sharedTypes.PROJECT_CREATED {
 			go func() {
 				if file, err := os.Create("/tmp/" + id + ".txt"); err != nil {
@@ -66,11 +66,11 @@ func CreateProjectHandler(c echo.Context) error {
 					log.Printf("Created project file for %s", id)
 				}
 			}()
-			
+
 			log.Printf("Successfully created project %s", id)
 			return c.String(200, id)
 		}
-		
+
 		log.Printf("Project creation failed for %s with response: %s", id, response)
 		return c.String(500, "Project creation failed: "+response)
 
@@ -83,7 +83,7 @@ func CreateProjectHandler(c echo.Context) error {
 
 func DeleteProjectHandler(c echo.Context) error {
 	projectId := c.Param("projectId")
-	
+
 	if projectId == "" {
 		return c.String(400, "Project ID is required")
 	}
@@ -105,18 +105,18 @@ func DeleteProjectHandler(c echo.Context) error {
 	select {
 	case response := <-ch:
 		log.Printf("Received delete response for project %s: %s", projectId, response)
-		
+
 		if response == sharedTypes.PROJECT_DELETED {
 			err = os.Remove("/tmp/" + projectId + ".txt")
 			if err != nil {
 				log.Printf("Error deleting file for project %s: %v", projectId, err)
 				log.Printf("Project %s deleted successfully (file cleanup failed)", projectId)
 			}
-			
+
 			log.Printf("Successfully deleted project %s", projectId)
 			return c.String(200, "Project deleted successfully")
 		}
-		
+
 		log.Printf("Project deletion failed for %s with response: %s", projectId, response)
 		return c.String(500, "Project deletion failed: "+response)
 

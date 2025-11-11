@@ -15,10 +15,10 @@ func SetChatRouter(r *echo.Echo) {
 }
 
 func ChatRoutes() {
-	chatGroup := router.Group("/{projectId}")
+	chatGroup := router.Group("/project")
 	{
-		chatGroup.POST("", ChatMessageHandler)
-		chatGroup.GET("", GetProjectChatByIdHandler)
+		chatGroup.POST("/:projectId", ChatMessageHandler)
+		chatGroup.GET("/:projectId", GetProjectChatByIdHandler)
 	}
 }
 
@@ -35,20 +35,20 @@ func ChatMessageHandler(c echo.Context) error {
 	}
 	prompt := chatReq.Prompt
 
-	file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return c.String(404, "project doesn't exist")
+	go func() {
+		file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			log.Printf("Failed to open file for project %s: %v", projectId, err)
+			return
 		}
-		return c.String(500, "Failed to open file")
-	}
-	defer file.Close()
+		defer file.Close()
 
-	if _, err := file.WriteString("User: " + prompt + "\n"); err != nil {
-		return c.String(500, "Failed to write to file")
-	}
+		if _, err := file.WriteString("USER_PROMPT : \"" + prompt + "\"\n"); err != nil {
+			log.Printf("Failed to write prompt to file for project %s: %v", projectId, err)
+		}
+	}()
 
-	err = clients.KafkaSenderClientToOrchestrator.WriteMessage(
+	err := clients.KafkaSenderClientToOrchestrator.WriteMessage(
 		[]byte(projectId),
 		[]byte(sharedTypes.PROMPT+"|"+prompt),
 	)
@@ -68,9 +68,18 @@ func ChatMessageHandler(c echo.Context) error {
 		response := string(msg.Value)
 
 		if responseId == projectId && response != "" {
-			if _, err := file.WriteString("AI: " + response + "\n"); err != nil {
-				return c.String(500, "Failed to write to file")
-			}
+			go func() {
+				file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY, 0644)
+				if err != nil {
+					log.Printf("Failed to open file for response in project %s: %v", projectId, err)
+					return
+				}
+				defer file.Close()
+
+				if _, err := file.WriteString("AGENT_RESPONSE : \"" + response + "\"\n"); err != nil {
+					log.Printf("Failed to write response to file for project %s: %v", projectId, err)
+				}
+			}()
 			return c.String(200, response)
 		}
 	}

@@ -30,17 +30,11 @@ const kafka = new Kafka(kafkaConfig);
 export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({
-  groupId: `${GROUP_ID.SERVING_POD}-${Date.now()}`,
-  sessionTimeout: 10000,
-  heartbeatInterval: 1000,
-  maxWaitTimeInMs: 500,
+  groupId: GROUP_ID.SERVING_POD,
 });
 
 export const consumerServeFromControl = kafka.consumer({
-  groupId: `${GROUP_ID.SERVING_TO_CONTROL}-${Date.now()}`,
-  sessionTimeout: 10000,
-  heartbeatInterval: 1000,
-  maxWaitTimeInMs: 500,
+  groupId: GROUP_ID.SERVING_TO_CONTROL,
 });
 
 async function connectConsumerServeFromControl() {
@@ -105,7 +99,6 @@ async function start() {
 
   await consumerServeFromControl.subscribe({
     topic: TOPIC.CONTROL_TO_SERVING,
-    fromBeginning: true,
   });
 
   await consumerServeFromControl.run({
