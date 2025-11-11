@@ -53,9 +53,9 @@ func main() {
 			}
 			pId := string(msg.Key)
 			response := string(msg.Value)
-			
+
 			log.Printf("Received message from serving pod for project %s: %s", pId, response)
-			
+
 			if ch, ok := handlers.ServerResponses[pId]; ok {
 				select {
 				case ch <- response:
@@ -65,7 +65,7 @@ func main() {
 				}
 				delete(handlers.ServerResponses, pId)
 			}
-			
+
 			switch response {
 			case sharedTypes.PROJECT_CREATED:
 				log.Printf("Forwarding PROJECT_CREATED to backend for project %s", pId)
@@ -75,18 +75,35 @@ func main() {
 				} else {
 					log.Printf("Successfully sent PROJECT_CREATED to backend for project %s", pId)
 				}
+
 			case sharedTypes.PROJECT_FAILED:
 				log.Printf("Forwarding PROJECT_FAILED to backend for project %s", pId)
 				err := KafkaSenderClientToBackend.WriteMessage([]byte(pId), []byte(sharedTypes.PROJECT_FAILED))
 				if err != nil {
 					log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", pId, err)
 				}
-			case sharedTypes.PROJECT_RUN:
-				log.Printf("Forwarding PROJECT_RUN to backend for project %s", pId)
-				err := KafkaSenderClientToBackend.WriteMessage([]byte(pId), []byte(sharedTypes.PROJECT_RUN))
+
+			// case sharedTypes.PROJECT_RUN:
+			// 	log.Printf("Forwarding PROJECT_RUN to backend for project %s", pId)
+			// 	err := KafkaSenderClientToBackend.WriteMessage([]byte(pId), []byte(sharedTypes.PROJECT_RUN))
+			// 	if err != nil {
+			// 		log.Printf("Failed to send PROJECT_RUN message to backend for project %s: %v", pId, err)
+			// 	}
+
+			case sharedTypes.PROJECT_RUN_SUCCESS:
+				log.Printf("Forwarding PROJECT_RUN_SUCCESS to backend for project %s", pId)
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(pId), []byte(sharedTypes.PROJECT_RUN_SUCCESS))
 				if err != nil {
-					log.Printf("Failed to send PROJECT_RUN message to backend for project %s: %v", pId, err)
+					log.Printf("Failed to send PROJECT_RUN_SUCCESS message to backend for project %s: %v", pId, err)
 				}
+
+			case sharedTypes.PROJECT_RUN_FAILED:
+				log.Printf("Forwarding PROJECT_RUN_FAILED to backend for project %s", pId)
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(pId), []byte(sharedTypes.PROJECT_RUN_FAILED))
+				if err != nil {
+					log.Printf("Failed to send PROJECT_RUN_FAILED message to backend for project %s: %v", pId, err)
+				}
+
 			default:
 				log.Printf("Unknown response from serving pod for project %s: %s", pId, response)
 			}
@@ -120,6 +137,27 @@ func main() {
 				if err != nil {
 					log.Printf("Failed to send PROMPT_RESPONSE message to backend for project %s: %v", responseId, err)
 				}
+
+			case sharedTypes.PROJECT_FAILED:
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROJECT_FAILED)) // project failed has smoe extra things to send
+				if err != nil {
+					log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", responseId, err)
+				}
+
+			case sharedTypes.PROJECT_BUILD_SUCCESS:
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROJECT_BUILD_SUCCESS))
+				if err != nil {
+					log.Printf("Failed to send PROJECT_BUILD_SUCCESS message to backend for project %s: %v", responseId, err)
+				}
+
+			case sharedTypes.PROJECT_BUILD_FAILED:
+				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROJECT_BUILD_FAILED))
+				if err != nil {
+					log.Printf("Failed to send PROJECT_BUILD_FAILED message to backend for project %s: %v", responseId, err)
+				}
+
+			default:
+				log.Printf("Unknown response from control pod for project %s: %s", responseId, response)
 			}
 		}
 	}()
@@ -144,6 +182,7 @@ func main() {
 					KafkaReceiverClientFromServing,
 					KafkaSenderClientToBackend,
 				)
+
 			case sharedTypes.DELETE_PROJECT:
 				log.Printf("Processing DELETE_PROJECT request for project %s", projectId)
 				go handlers.DeleteProjectHandler(
@@ -153,6 +192,7 @@ func main() {
 					// KafkaReceiverClientFromServing,
 					KafkaSenderClientToBackend,
 				)
+
 			case sharedTypes.PROMPT:
 				log.Printf("Processing PROMPT request for project %s", projectId)
 				go handlers.ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubHandler(
@@ -161,6 +201,23 @@ func main() {
 					KafkaSenderClientToControl,
 					KafkaReceiverClientFromControl,
 					KafkaSenderClientToControl,
+				)
+
+			case sharedTypes.PROJECT_BUILD:
+				log.Printf("Processing PROJECT_BUILD request for project %s", projectId)
+				go handlers.BuildProjectHandler(
+					projectId,
+					KafkaSenderClientToControl,
+					KafkaSenderClientToServing,
+					KafkaSenderClientToBackend,
+				)
+
+			case sharedTypes.PROJECT_RUN:
+				log.Printf("Processing PROJECT_RUN request for project %s", projectId)
+				go handlers.RunProjectHandler(
+					projectId,
+					KafkaSenderClientToServing,
+					KafkaSenderClientToBackend,
 				)
 			default:
 				log.Printf("Unknown request type: %s for project %s", request, projectId)

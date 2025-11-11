@@ -36,7 +36,7 @@ func main() {
 			projectId := string(msg.Key)
 			response := string(msg.Value)
 			log.Printf("Received response for project %s: %s", projectId, response)
-			
+
 			if ch, ok := responseManager.GetAndDelete(projectId); ok {
 				select {
 				case ch <- response:

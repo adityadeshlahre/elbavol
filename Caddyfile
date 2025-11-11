@@ -1,0 +1,7 @@
+*.localhost:3000 {
+	tls internal
+	reverse_proxy localhost:3001
+	handle_errors {
+		respond "404 Not Found" 404
+	}
+}

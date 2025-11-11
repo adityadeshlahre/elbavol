@@ -22,6 +22,8 @@ func ProjectRoutes() {
 	{
 		projectGroup.POST("/create", CreateProjectHandler)
 		projectGroup.DELETE("/delete/:projectId", DeleteProjectHandler)
+		projectGroup.POST("/build", BuildHandler)
+		projectGroup.POST("/run", RunHandler)
 	}
 }
 

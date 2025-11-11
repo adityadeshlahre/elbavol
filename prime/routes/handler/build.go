@@ -1,0 +1,58 @@
+package handler
+
+import (
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/adityadeshlahre/elbavol/prime/clients"
+	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
+	"github.com/labstack/echo/v4"
+)
+
+func BuildHandler(c echo.Context) error {
+	projectId := c.QueryParam("projectId")
+	if projectId == "" {
+		return c.String(400, "projectId required")
+	}
+
+	if _, err := os.Stat("/tmp/" + projectId + ".txt"); os.IsNotExist(err) {
+		return c.String(404, "project not found")
+	}
+
+	err := clients.KafkaSenderClientToOrchestrator.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_BUILD))
+	if err != nil {
+		return c.String(500, "failed to trigger build")
+	}
+
+	log.Printf("Triggered build for project %s", projectId)
+
+	responseManager := c.Get("responseManager").(ResponseManager)
+	ch := make(chan string, 1)
+	responseManager.SetChannel(projectId, ch)
+
+	select {
+	case response := <-ch:
+		log.Printf("Received build response for project %s: %s", projectId, response)
+		switch response {
+		case sharedTypes.PROJECT_BUILD_SUCCESS:
+			err = clients.KafkaSenderClientToOrchestrator.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
+			if err != nil {
+				log.Printf("Failed to trigger run for project %s: %v", projectId, err)
+				return c.String(500, "failed to trigger run")
+			}
+			log.Printf("Triggered run for project %s", projectId)
+		case sharedTypes.PROJECT_BUILD_FAILED:
+			log.Printf("Build failed for project %s", projectId)
+			return c.String(500, "build failed")
+		default:
+			log.Printf("Unknown build response for project %s: %s", projectId, response)
+			return c.String(500, "unknown build response")
+		}
+	case <-c.Request().Context().Done():
+		log.Printf("Build request for project %s timed out", projectId)
+		return c.String(504, "build timed out")
+	}
+
+	return c.String(200, fmt.Sprintf("%s.localhost:3000", projectId))
+}

@@ -106,3 +106,102 @@ func ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubH
 
 	log.Printf("Sent LLM response back to backend for project %s", projectId)
 }
+
+func BuildProjectHandler(
+	projectId string,
+	senderToControl *kafkaShared.KafkaClientWriter,
+	senderToServing *kafkaShared.KafkaClientWriter,
+	senderToBackend *kafkaShared.KafkaClientWriter,
+) error {
+	err := senderToControl.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_BUILD))
+	if err != nil {
+		log.Printf("Failed to send PROJECT_BUILD message to control pod for project %s: %v", projectId, err)
+		return err
+	}
+
+	ch := make(chan string, 1)
+	ControlResponses[projectId] = ch
+	payload := <-ch
+
+	if payload != sharedTypes.PROJECT_BUILD_SUCCESS {
+		log.Printf("Project build failed for project %s: %s", projectId, payload)
+		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_BUILD_FAILED))
+		if err != nil {
+			log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", projectId, err)
+		}
+		return nil
+	} else {
+		log.Printf("Project build succeeded for project %s", projectId)
+		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_BUILD_SUCCESS))
+		if err != nil {
+			log.Printf("Failed to send PROJECT_BUILD_SUCCESS message to backend for project %s: %v", projectId, err)
+			return err
+		}
+	}
+
+	err = senderToServing.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
+	if err != nil {
+		log.Printf("Failed to send PROJECT_BUILD message to serving pod for project %s: %v", projectId, err)
+		return err
+	}
+
+	ch = make(chan string, 1)
+	ControlResponses[projectId] = ch
+	payload = <-ch
+
+	if payload != sharedTypes.PROJECT_RUN_SUCCESS {
+		log.Printf("Project run failed for project %s: %s", projectId, payload)
+		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_FAILED))
+		if err != nil {
+			log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", projectId, err)
+		}
+		return err
+	} else {
+		log.Printf("Project run succeeded for project %s", projectId)
+		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN_SUCCESS))
+		if err != nil {
+			log.Printf("Failed to send PROJECT_RUN_SUCCESS message to backend for project %s: %v", projectId,
+				err)
+			return err
+		}
+	}
+
+	log.Printf("Sent PROJECT_BUILD message to serving pod for project %s", projectId)
+	return nil
+}
+
+func RunProjectHandler(
+	projectId string,
+	senderToServing *kafkaShared.KafkaClientWriter,
+	senderToBackend *kafkaShared.KafkaClientWriter,
+) error {
+	err := senderToServing.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
+	if err != nil {
+		log.Printf("Failed to send PROJECT_RUN message to serving pod for project %s: %v", projectId, err)
+		return err
+	}
+
+	ch := make(chan string, 1)
+	ControlResponses[projectId] = ch
+	payload := <-ch
+
+	if payload != sharedTypes.PROJECT_RUN_SUCCESS {
+		log.Printf("Project run failed for project %s: %s", projectId, payload)
+		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_FAILED))
+		if err != nil {
+			log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", projectId, err)
+		}
+		return err
+	} else {
+		log.Printf("Project run succeeded for project %s", projectId)
+		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN_SUCCESS))
+		if err != nil {
+			log.Printf("Failed to send PROJECT_RUN_SUCCESS message to backend for project %s: %v", projectId,
+				err)
+			return err
+		}
+	}
+
+	log.Printf("Sent PROJECT_RUN message to serving pod for project %s", projectId)
+	return nil
+}

@@ -21,9 +21,9 @@ func main() {
 		domain = "localhost"
 	}
 
-	caddyfile := fmt.Sprintf(`*.%s {
+	caddyfile := fmt.Sprintf(`*.%s:3000 { // inProd remove :3000
 		tls internal
-		reverse_proxy {http.request.host.labels.3}.default.svc.cluster.local:3000
+		reverse_proxy localhost:3000
 		handle_errors {
 			respond "404 Not Found" 404
 		}

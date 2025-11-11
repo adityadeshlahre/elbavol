@@ -52,7 +52,7 @@ export const serveTheProject = async (
         {
           key: projectId,
           value: JSON.stringify({
-            key: MESSAGE_KEYS.PROJECT_FAILED,
+            key: MESSAGE_KEYS.PROJECT_RUN_FAILED,
             error: "No start script in package.json",
           }),
         },
@@ -91,7 +91,7 @@ export const serveTheProject = async (
           {
             key: projectId,
             value: JSON.stringify({
-              key: MESSAGE_KEYS.PROJECT_RUN,
+              key: MESSAGE_KEYS.PROJECT_RUN_SUCCESS,
               projectId,
             }),
           },
@@ -104,7 +104,7 @@ export const serveTheProject = async (
           {
             key: projectId,
             value: JSON.stringify({
-              key: MESSAGE_KEYS.PROJECT_FAILED,
+              key: MESSAGE_KEYS.PROJECT_RUN_FAILED,
               error: `Server process exited with code ${code}`,
             }),
           },

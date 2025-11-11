@@ -61,7 +61,7 @@ export const buildProjectAndNotifyToRun = async (
         messages: [
           {
             value: JSON.stringify({
-              key: MESSAGE_KEYS.PROJECT_FAILED,
+              key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
               projectId,
               error: `Failed to install dependencies: ${error}`,
             }),
@@ -85,7 +85,7 @@ export const buildProjectAndNotifyToRun = async (
         messages: [
           {
             value: JSON.stringify({
-              key: MESSAGE_KEYS.PROJECT_FAILED,
+              key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
               projectId,
               error: `Failed to build project: ${error}`,
             }),
@@ -100,7 +100,7 @@ export const buildProjectAndNotifyToRun = async (
       messages: [
         {
           value: JSON.stringify({
-            key: MESSAGE_KEYS.PROJECT_BUILD,
+            key: MESSAGE_KEYS.PROJECT_BUILD_SUCCESS,
             projectId,
           }),
         },
@@ -112,7 +112,7 @@ export const buildProjectAndNotifyToRun = async (
       messages: [
         {
           key: projectId,
-          value: MESSAGE_KEYS.PROJECT_BUILD,
+          value: MESSAGE_KEYS.PROJECT_RUN,
         },
       ],
     });
@@ -124,7 +124,7 @@ export const buildProjectAndNotifyToRun = async (
       messages: [
         {
           value: JSON.stringify({
-            key: MESSAGE_KEYS.PROJECT_FAILED,
+            key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
             projectId,
             error: `Build error: ${error instanceof Error ? error.message : String(error)}`,
           }),
