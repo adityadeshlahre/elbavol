@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"strings"
 
@@ -9,7 +10,6 @@ import (
 	shared "github.com/adityadeshlahre/elbavol/shared"
 	k8sShared "github.com/adityadeshlahre/elbavol/shared/k8s"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
-	"github.com/adityadeshlahre/elbavol/shared/prompt"
 	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
 	"k8s.io/client-go/kubernetes"
 )
@@ -172,55 +172,61 @@ func main() {
 			projectId := string(msg.Key)
 			request := string(msg.Value)
 
-			switch request {
-			case sharedTypes.CREATE_PROJECT:
-				log.Printf("Processing CREATE_PROJECT request for project %s", projectId)
-				go handlers.CreateProjectHandler(
-					projectId,
-					K8sClient,
-					KafkaSenderClientToControl,
-					KafkaReceiverClientFromServing,
-					KafkaSenderClientToBackend,
-				)
+			var chatMsg sharedTypes.ChatMessage
+			if err := json.Unmarshal([]byte(request), &chatMsg); err == nil {
+				if chatMsg.Type == sharedTypes.PROMPT {
+					log.Printf("Processing PROMPT request for project %s", projectId)
+					go handlers.ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubHandler(
+						projectId,
+						chatMsg.Payload,
+						KafkaSenderClientToControl,
+						KafkaReceiverClientFromControl,
+						KafkaSenderClientToControl,
+					)
+				} else {
+					log.Printf("Unknown JSON request type: %s for project %s", chatMsg.Type, projectId)
+				}
+			} else {
+				switch request {
+				case sharedTypes.CREATE_PROJECT:
+					log.Printf("Processing CREATE_PROJECT request for project %s", projectId)
+					go handlers.CreateProjectHandler(
+						projectId,
+						K8sClient,
+						KafkaSenderClientToControl,
+						KafkaReceiverClientFromServing,
+						KafkaSenderClientToBackend,
+					)
 
-			case sharedTypes.DELETE_PROJECT:
-				log.Printf("Processing DELETE_PROJECT request for project %s", projectId)
-				go handlers.DeleteProjectHandler(
-					projectId,
-					K8sClient,
-					// KafkaSenderClientToControl,
-					// KafkaReceiverClientFromServing,
-					KafkaSenderClientToBackend,
-				)
+				case sharedTypes.DELETE_PROJECT:
+					log.Printf("Processing DELETE_PROJECT request for project %s", projectId)
+					go handlers.DeleteProjectHandler(
+						projectId,
+						K8sClient,
+						// KafkaSenderClientToControl,
+						// KafkaReceiverClientFromServing,
+						KafkaSenderClientToBackend,
+					)
 
-			case sharedTypes.PROMPT:
-				log.Printf("Processing PROMPT request for project %s", projectId)
-				go handlers.ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubHandler(
-					projectId,
-					prompt.GetPromptFromBackendMessage(request),
-					KafkaSenderClientToControl,
-					KafkaReceiverClientFromControl,
-					KafkaSenderClientToControl,
-				)
+				case sharedTypes.PROJECT_BUILD:
+					log.Printf("Processing PROJECT_BUILD request for project %s", projectId)
+					go handlers.BuildProjectHandler(
+						projectId,
+						KafkaSenderClientToControl,
+						KafkaSenderClientToServing,
+						KafkaSenderClientToBackend,
+					)
 
-			case sharedTypes.PROJECT_BUILD:
-				log.Printf("Processing PROJECT_BUILD request for project %s", projectId)
-				go handlers.BuildProjectHandler(
-					projectId,
-					KafkaSenderClientToControl,
-					KafkaSenderClientToServing,
-					KafkaSenderClientToBackend,
-				)
-
-			case sharedTypes.PROJECT_RUN:
-				log.Printf("Processing PROJECT_RUN request for project %s", projectId)
-				go handlers.RunProjectHandler(
-					projectId,
-					KafkaSenderClientToServing,
-					KafkaSenderClientToBackend,
-				)
-			default:
-				log.Printf("Unknown request type: %s for project %s", request, projectId)
+				case sharedTypes.PROJECT_RUN:
+					log.Printf("Processing PROJECT_RUN request for project %s", projectId)
+					go handlers.RunProjectHandler(
+						projectId,
+						KafkaSenderClientToServing,
+						KafkaSenderClientToBackend,
+					)
+				default:
+					log.Printf("Unknown request type: %s for project %s", request, projectId)
+				}
 			}
 		}
 	}()

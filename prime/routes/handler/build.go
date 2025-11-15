@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/adityadeshlahre/elbavol/prime/clients"
 	sharedTypes "github.com/adityadeshlahre/elbavol/shared/types"
@@ -55,10 +56,18 @@ func BuildHandler(c echo.Context) error {
 					return c.String(200, fmt.Sprintf("%s.localhost:3000", projectId))
 				case sharedTypes.PROJECT_RUN_FAILED:
 					log.Printf("Run failed for project %s", projectId)
-					return c.String(500, "run failed")
+					errorMsg := "unknown error"
+					if idx := strings.Index(runResponse, "|"); idx != -1 {
+						errorMsg = runResponse[idx+1:]
+					}
+					return c.String(500, "run failed: "+errorMsg)
 				case sharedTypes.PROJECT_FAILED:
 					log.Printf("Run failed for project %s", projectId)
-					return c.String(500, "run failed")
+					errorMsg := "unknown error"
+					if idx := strings.Index(runResponse, "|"); idx != -1 {
+						errorMsg = runResponse[idx+1:]
+					}
+					return c.String(500, "run failed: "+errorMsg)
 				default:
 					log.Printf("Unknown run response for project %s: %s", projectId, runResponse)
 					return c.String(500, "unknown run response")
@@ -69,7 +78,11 @@ func BuildHandler(c echo.Context) error {
 			}
 		case sharedTypes.PROJECT_BUILD_FAILED:
 			log.Printf("Build failed for project %s", projectId)
-			return c.String(500, "build failed")
+			errorMsg := "unknown error"
+			if idx := strings.Index(response, "|"); idx != -1 {
+				errorMsg = response[idx+1:]
+			}
+			return c.String(500, "build failed: "+errorMsg)
 		default:
 			log.Printf("Unknown build response for project %s: %s", projectId, response)
 			return c.String(500, "unknown build response")

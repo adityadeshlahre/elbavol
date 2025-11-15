@@ -17,9 +17,10 @@ type KafkaClientWriter struct {
 
 func NewKafkaClientReader(kafkaURL string, topic string, groupID string) *KafkaClientReader {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{kafkaURL},
-		Topic:   topic,
-		GroupID: groupID,
+		Brokers:     []string{kafkaURL},
+		Topic:       topic,
+		GroupID:     groupID,
+		StartOffset: kafka.LastOffset,
 	})
 
 	return &KafkaClientReader{

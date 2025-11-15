@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 
@@ -26,6 +27,11 @@ type ChatReq struct {
 	Prompt string `json:"prompt"`
 }
 
+type ChatMessage struct {
+	Type    string `json:"type"`
+	Payload string `json:"payload"`
+}
+
 func ChatMessageHandler(c echo.Context) error {
 
 	projectId := c.Param("projectId")
@@ -48,9 +54,15 @@ func ChatMessageHandler(c echo.Context) error {
 		}
 	}()
 
+	msg := sharedTypes.ChatMessage{
+		Type:    sharedTypes.PROMPT,
+		Payload: prompt,
+	}
+	data, _ := json.Marshal(msg)
+
 	err := clients.KafkaSenderClientToOrchestrator.WriteMessage(
 		[]byte(projectId),
-		[]byte(sharedTypes.PROMPT+"|"+prompt),
+		data,
 	)
 	if err != nil {
 		return c.String(500, "Failed to send message")

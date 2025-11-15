@@ -226,6 +226,7 @@ async function start() {
 
   await consumer.subscribe({
     topic: TOPIC.ORCHESTRATOR_TO_SERVING,
+    fromBeginning: false,
   });
 
   await consumer.run({

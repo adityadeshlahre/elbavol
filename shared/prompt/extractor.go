@@ -2,7 +2,7 @@ package prompt
 
 import "strings"
 
-func GetPromptFromBackendMessage(message string) string {
+func GetPromptFromBackendMessage(message string) string { // use-less
 	parts := strings.SplitN(message, "|", 2)
 	if len(parts) != 2 {
 		return ""

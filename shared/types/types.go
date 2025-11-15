@@ -58,3 +58,8 @@ const (
 	PROMPT                = "PROMPT"
 	PROMPT_RESPONSE       = "PROMPT_RESPONSE"
 )
+
+type ChatMessage struct {
+	Type    string `json:"type"`
+	Payload string `json:"payload"`
+}

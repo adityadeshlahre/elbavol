@@ -311,6 +311,7 @@ async function start() {
 
   await consumerControlFromServe.subscribe({
     topic: TOPIC.SERVING_TO_CONTROL,
+    fromBeginning: false,
   });
 
   await consumerControlFromServe.run({
