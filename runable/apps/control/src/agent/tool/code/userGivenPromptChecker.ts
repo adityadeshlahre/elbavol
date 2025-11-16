@@ -1,7 +1,7 @@
 import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
-import { SYSTEM_PROMPTS } from "@/prompt/systemPrompt";
+import { SYSTEM_PROMPTS } from "@/prompt";
 
 const userGivenPromptSchema = z.string().min(1).max(256);
 

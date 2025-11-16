@@ -1,7 +1,7 @@
 import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
-import { SYSTEM_PROMPTS } from "@/prompt/systemPrompt";
+import { SYSTEM_PROMPTS } from "@/prompt";
 
 export const enhancePromptInput = z.object({
   prompt: z.string().min(1, "Prompt is required"),

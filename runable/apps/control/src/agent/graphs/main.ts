@@ -1,5 +1,5 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
-import { sendSSEMessage } from "../../SSE";
+import { sendSSEMessage } from "../../sse";
 import { promptAnalyzer } from "../tool/analysis/promptAnalyzer";
 import { buildSource } from "../tool/code/buildSource";
 import { enhancePrompt } from "../tool/code/enhancePrompt";
@@ -8,8 +8,8 @@ import { validateBuild } from "../tool/code/validateBuild";
 import { getContext } from "../tool/dry/getContext";
 import { saveContext } from "../tool/dry/saveContext";
 import { testBuild } from "../tool/dry/testBuild";
-import { pushFilesToR2 } from "../tool/r2PullPush/push";
-import { toolExecutor } from "../workflow/tools";
+import { toolExecutor } from "../tool/executor/toolexe";
+import { pushFilesToR2 } from "../tool/r2/push";
 
 export const GraphAnnotation = Annotation.Root({
   projectId: Annotation<string>(),
@@ -21,18 +21,30 @@ export const GraphAnnotation = Annotation.Root({
   toolResults: Annotation<any[]>(),
   buildStatus: Annotation<string>(),
   iterations: Annotation<number>({ reducer: (a, b) => b, default: () => 0 }),
-  completed: Annotation<boolean>({ reducer: (a, b) => b, default: () => false }),
+  completed: Annotation<boolean>({
+    reducer: (a, b) => b,
+    default: () => false,
+  }),
   error: Annotation<string>(),
   pushResult: Annotation<any>(),
   clientId: Annotation<string>(),
-  accumulatedResponses: Annotation<string[]>({ reducer: (a, b) => [...a, ...b], default: () => [] }),
+  accumulatedResponses: Annotation<string[]>({
+    reducer: (a, b) => [...a, ...b],
+    default: () => [],
+  }),
 });
 
 type GraphState = typeof GraphAnnotation.State;
 
 async function analyzePrompt(state: GraphState): Promise<Partial<GraphState>> {
-  sendSSEMessage(state.clientId, { type: "analyzing", message: "Analyzing prompt..." });
-  const result = await promptAnalyzer.invoke({ prompt: state.prompt, projectId: state.projectId });
+  sendSSEMessage(state.clientId, {
+    type: "analyzing",
+    message: "Analyzing prompt...",
+  });
+  const result = await promptAnalyzer.invoke({
+    prompt: state.prompt,
+    projectId: state.projectId,
+  });
   return { analysis: result.analysis };
 }
 
@@ -53,7 +65,10 @@ async function enhancePromptNode(
       ? result.enhancedPrompt || state.prompt
       : state.prompt;
     if (result.success && result.enhancedPrompt) {
-      return { enhancedPrompt: enhanced, accumulatedResponses: [`Enhanced Prompt: ${result.enhancedPrompt}`] };
+      return {
+        enhancedPrompt: enhanced,
+        accumulatedResponses: [`Enhanced Prompt: ${result.enhancedPrompt}`],
+      };
     }
   }
   return { enhancedPrompt: enhanced };
@@ -69,7 +84,10 @@ async function planChanges(state: GraphState): Promise<Partial<GraphState>> {
     contextInfo: JSON.stringify(state.context),
   });
   const plan = result.success ? result.plan : "Default plan";
-  return { generatedPlan: plan, accumulatedResponses: result.success ? [`Planning: ${result.plan}`] : [] };
+  return {
+    generatedPlan: plan,
+    accumulatedResponses: result.success ? [`Planning: ${result.plan}`] : [],
+  };
 }
 
 async function getProjectContext(
@@ -90,15 +108,12 @@ async function executeTools(state: GraphState): Promise<Partial<GraphState>> {
     message: "Executing tools...",
   });
 
-  // Import model and tools
   const { model } = await import("../../agent/client");
-  const { SYSTEM_PROMPTS } = await import("../../prompt/systemPrompt");
+  const { SYSTEM_PROMPTS } = await import("../../prompt");
   const tools = await import("../tool/index");
 
-  // Create model with tools
   const modelWithTools = model.bindTools(Object.values(tools));
 
-  // Execute the plan using the model with tools
   const result = await modelWithTools.invoke([
     {
       role: "system",
@@ -110,10 +125,46 @@ async function executeTools(state: GraphState): Promise<Partial<GraphState>> {
     },
   ]);
 
-  const { stateManager } = await import("../state/manager");
-  stateManager.incrementIteration(state.projectId);
-  const executionSummary = `Execution Results: ${result.tool_calls?.length || 0} tools executed`;
-  return { toolResults: [result], iterations: state.iterations + 1, accumulatedResponses: [executionSummary] };
+  const toolResults = [];
+  let executedCount = 0;
+
+  if (result.tool_calls) {
+    const toolMap = Object.values(tools).reduce(
+      (acc, tool) => {
+        acc[tool.name] = tool;
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
+
+    for (const toolCall of result.tool_calls) {
+      try {
+        const tool = toolMap[toolCall.name];
+        if (tool) {
+          const toolResult = await tool.invoke(toolCall.args);
+          toolResults.push({ toolCall, result: toolResult });
+          executedCount++;
+        } else {
+          toolResults.push({
+            toolCall,
+            error: `Tool ${toolCall.name} not found`,
+          });
+        }
+      } catch (error) {
+        toolResults.push({
+          toolCall,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  const executionSummary = `Execution Results: ${executedCount} tools executed successfully`;
+  return {
+    toolResults,
+    iterations: state.iterations + 1,
+    accumulatedResponses: [executionSummary],
+  };
 }
 
 async function validateBuildNode(
@@ -186,13 +237,14 @@ async function saveContextNode(
     context: state.context,
     filePath: `${state.projectId}/context.json`,
   });
-  const { stateManager } = await import("../state/manager");
-  stateManager.setStatus(state.projectId, "completed");
   return { completed: true };
 }
 
 async function runAppNode(state: GraphState): Promise<Partial<GraphState>> {
-  sendSSEMessage(state.clientId, { type: "running", message: "Running application..." });
+  sendSSEMessage(state.clientId, {
+    type: "running",
+    message: "Running application...",
+  });
   await buildSource.invoke({ projectId: state.projectId });
 
   const { producer } = await import("../../index");
@@ -203,7 +255,10 @@ async function runAppNode(state: GraphState): Promise<Partial<GraphState>> {
     messages: [
       {
         key: state.projectId,
-        value: JSON.stringify({ key: MESSAGE_KEYS.PROJECT_RUN, projectId: state.projectId }),
+        value: JSON.stringify({
+          key: MESSAGE_KEYS.PROJECT_RUN,
+          projectId: state.projectId,
+        }),
       },
     ],
   });

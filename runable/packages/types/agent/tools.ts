@@ -1,11 +1,11 @@
 export interface PromptAnalysis {
   intent:
-    | "creation"
-    | "debugging"
-    | "modification"
-    | "validation"
-    | "information"
-    | "general";
+  | "creation"
+  | "debugging"
+  | "modification"
+  | "validation"
+  | "information"
+  | "general";
   complexity: "low" | "medium" | "high";
   requiredTools: string[];
   actionPlan: string[];
@@ -32,10 +32,4 @@ export interface ToolExecutorInput {
   projectId: string;
   toolName: string;
   toolInput: any;
-}
-
-export interface ContextManagerInput {
-  projectId: string;
-  action: "load" | "save" | "update";
-  data?: any;
 }

@@ -2,7 +2,7 @@ import http from "http";
 import { parse } from "url";
 
 const SSE_PORT = 3001;
-const SSE_HOST = "0.0.0.0"; // Listen on all interfaces
+const SSE_HOST = "0.0.0.0";
 
 interface SSEClient {
   id: string;
@@ -14,12 +14,10 @@ const clients = new Map<string, SSEClient>();
 
 export function startSSEServer(): string {
   if (sseServer) {
-    // Already started
     return `http://localhost:${SSE_PORT}/sse`;
   }
 
   sseServer = http.createServer((req, res) => {
-    // Handle CORS preflight
     if (req.method === "OPTIONS") {
       res.writeHead(200, {
         "Access-Control-Allow-Origin": "*",
@@ -41,7 +39,6 @@ export function startSSEServer(): string {
         return;
       }
 
-      // Set SSE headers
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
@@ -50,13 +47,11 @@ export function startSSEServer(): string {
         "Access-Control-Allow-Headers": "Cache-Control",
       });
 
-      // Send initial connection message
       res.write(`data: ${JSON.stringify({ type: "connected", clientId })}\n\n`);
 
       const client: SSEClient = { id: clientId, res };
       clients.set(clientId, client);
 
-      // Handle client disconnect
       req.on("close", () => {
         clients.delete(clientId);
       });
@@ -104,7 +99,6 @@ export function getSSEUrl(clientId: string): string {
   return `http://localhost:${SSE_PORT}/sse?id=${clientId}`;
 }
 
-// Graceful shutdown
 process.on("SIGINT", () => {
   if (sseServer) {
     sseServer.close();

@@ -4,7 +4,7 @@ import { getObject, listObjects } from "@elbavol/r2";
 import fs from "fs";
 import { Kafka } from "kafkajs";
 import path from "path";
-import { agentInterface } from "./agent/interface";
+import { processPrompt } from "./agent/processPrompt";
 import { buildProjectAndNotifyToRun } from "./agent/tool/code/buildSource";
 import {
   pushProjectInitializationToServingPod,
@@ -295,12 +295,8 @@ async function start() {
             console.log(
               `Processing prompt for project ${projectId}: ${prompt}`,
             );
-            const result = await agentInterface.processUserPrompt(
-              projectId,
-              prompt,
-              producer,
-            );
-            console.log("Agent processing result:", result);
+            await processPrompt(projectId, prompt, producer);
+            console.log("Agent processing started for project:", projectId);
           } else {
             console.log(
               `Received unknown message: ${value} for project: ${projectId} from ORCHESTRATOR_TO_CONTROL`,

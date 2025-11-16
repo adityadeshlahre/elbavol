@@ -29,18 +29,3 @@ export interface ToolExecution {
   success: boolean;
   error?: string;
 }
-
-export interface WorkflowConfig {
-  maxIterations: number;
-  timeoutMs: number;
-  enableValidation: boolean;
-  enableContextSaving: boolean;
-}
-
-export interface AgentResponse {
-  success: boolean;
-  result: string;
-  state: AgentState;
-  error?: string;
-  iterations: number;
-}

@@ -1,6 +1,6 @@
 import { tool } from "langchain";
 import * as z from "zod";
-import { SYSTEM_PROMPTS } from "../../../prompt/systemPrompt";
+import { SYSTEM_PROMPTS } from "../../../prompt";
 
 const promptAnalyzerInput = z.object({
   prompt: z.string(),

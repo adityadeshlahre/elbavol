@@ -1,7 +1,7 @@
 import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
-import { SYSTEM_PROMPTS } from "./../../../prompt/systemPrompt";
+import { SYSTEM_PROMPTS } from "../../../prompt";
 
 const validateBuildInput = z.object({
   projectId: z.string().min(1, "Project ID is required"),
