@@ -83,21 +83,46 @@ export const serveTheProject = async (
 
   console.log(`Starting server for project ${projectId} on port ${port}`);
 
+  await new Promise(resolve => setTimeout(resolve, 5000));
+
+  const checkProc = Bun.spawn(["nc", "-z", "localhost", port.toString()], {
+    // TODO: i think this needs to be changed to something else on production
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const checkCode = await checkProc.exited;
+
+  if (checkCode === 0) {
+    await producer.send({
+      topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+      messages: [
+        {
+          key: projectId,
+          value: JSON.stringify({
+            key: MESSAGE_KEYS.PROJECT_RUN_SUCCESS,
+            projectId,
+          }),
+        },
+      ],
+    });
+  } else {
+    await producer.send({
+      topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+      messages: [
+        {
+          key: projectId,
+          value: JSON.stringify({
+            key: MESSAGE_KEYS.PROJECT_RUN_FAILED,
+            error: `Server did not start on port ${port}`,
+          }),
+        },
+      ],
+    });
+  }
+
   proc.exited.then(async (code) => {
-    if (code === 0) {
-      await producer.send({
-        topic: TOPIC.SERVING_TO_ORCHESTRATOR,
-        messages: [
-          {
-            key: projectId,
-            value: JSON.stringify({
-              key: MESSAGE_KEYS.PROJECT_RUN_SUCCESS,
-              projectId,
-            }),
-          },
-        ],
-      });
-    } else {
+    if (code !== 0) {
       await producer.send({
         topic: TOPIC.SERVING_TO_ORCHESTRATOR,
         messages: [
