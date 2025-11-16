@@ -6,8 +6,8 @@ import { SYSTEM_PROMPTS } from "@/prompt/systemPrompt";
 export const enhancePromptInput = z.object({
   prompt: z
     .string()
-    .min(1, "Prompt is required")
-    .max(500, "Prompt is too long"),
+    .min(1, "Prompt is required"),
+    // .max(256, "Prompt is too long"),
   contextInfo: z.string().optional(),
 });
 

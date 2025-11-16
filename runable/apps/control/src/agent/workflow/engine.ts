@@ -1,7 +1,7 @@
 import type { AgentResponse, AgentState, WorkflowConfig } from "@elbavol/types";
 import { HumanMessage } from "@langchain/core/messages";
 import { SYSTEM_PROMPTS } from "../../prompt/systemPrompt";
-import { agent } from "../graphs/main";
+import { mainGraph } from "../graphs/main";
 import { stateManager } from "../state/manager";
 
 class WorkflowEngine {
@@ -53,67 +53,47 @@ class WorkflowEngine {
     config: WorkflowConfig,
   ): Promise<AgentResponse> {
     const { projectId } = initialState;
-    let iteration = 0;
 
-    while (iteration < config.maxIterations) {
-      iteration = stateManager.incrementIteration(projectId);
-      stateManager.setStatus(projectId, "executing");
+    try {
+      const finalState = await mainGraph.invoke({
+        projectId,
+        prompt: initialState.currentTask,
+        iterations: 0,
+      });
 
-      try {
-        const currentState = stateManager.getState(projectId)!;
-        const systemPrompt = this.buildSystemPrompt(currentState);
+      // Update stateManager with final status
+      if (finalState.completed) {
+        stateManager.setStatus(projectId, "completed");
+      } else {
+        stateManager.setStatus(projectId, "error");
+      }
 
-        const messages = [
-          new HumanMessage(systemPrompt),
-          ...currentState.messages,
-        ];
-
-        const response = await agent.invoke(
-          {
-            messages,
-          },
-          {
-            configurable: { thread_id: projectId },
-          },
-        );
-
-        if (response.messages && response.messages.length > 0) {
-          const lastMessage = response.messages[response.messages.length - 1];
-          if (lastMessage) {
-            stateManager.addMessage(projectId, lastMessage);
-
-            const messageContent = lastMessage.content as string;
-
-            if (this.isWorkComplete(messageContent)) {
-              return {
-                success: true,
-                result: messageContent,
-                state: stateManager.getState(projectId)!,
-                iterations: iteration,
-              };
-            }
-          }
-        }
-
-        await this.delay(1000);
-      } catch (error) {
+      if (finalState.completed) {
+        return {
+          success: true,
+          result: "Project updated successfully",
+          state: stateManager.getState(projectId)!,
+          iterations: finalState.iterations,
+        };
+      } else {
         return {
           success: false,
-          result: "",
+          result: "Failed to complete the task",
           state: stateManager.getState(projectId)!,
-          error: error instanceof Error ? error.message : String(error),
-          iterations: iteration,
+          error: finalState.error || "Unknown error",
+          iterations: finalState.iterations,
         };
       }
+    } catch (error) {
+      stateManager.setStatus(projectId, "error");
+      return {
+        success: false,
+        result: "Maximum iterations reached without completion",
+        state: stateManager.getState(projectId)!,
+        error: error instanceof Error ? error.message : String(error),
+        iterations: 0,
+      };
     }
-
-    return {
-      success: false,
-      result: "Maximum iterations reached without completion",
-      state: stateManager.getState(projectId)!,
-      error: "Timeout: Maximum iterations exceeded",
-      iterations: iteration,
-    };
   }
 
   private buildSystemPrompt(state: AgentState): string {

@@ -3,7 +3,7 @@ import * as z from "zod";
 import { model } from "@/agent/client";
 import { SYSTEM_PROMPTS } from "@/prompt/systemPrompt";
 
-const userGivenPromptSchema = z.string().min(1).max(200);
+const userGivenPromptSchema = z.string().min(1).max(256);
 
 export const checkUserGivenPrompt = tool(
   async (
