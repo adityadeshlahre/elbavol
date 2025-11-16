@@ -65,7 +65,10 @@ export class AgentHandler {
         messages: [
           {
             key: projectId,
-            value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + (error instanceof Error ? error.message : String(error)),
+            value:
+              MESSAGE_KEYS.PROMPT_RESPONSE +
+              "|" +
+              (error instanceof Error ? error.message : String(error)),
           },
         ],
       });
@@ -104,7 +107,10 @@ export class AgentHandler {
           messages: [
             {
               key: projectId,
-              value: JSON.stringify({ key: MESSAGE_KEYS.PROJECT_RUN, projectId }),
+              value: JSON.stringify({
+                key: MESSAGE_KEYS.PROJECT_RUN,
+                projectId,
+              }),
             },
           ],
         });

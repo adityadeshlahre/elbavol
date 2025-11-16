@@ -1,21 +1,22 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
+import { sendSSEMessage } from "../../SSE";
 import { promptAnalyzer } from "../tool/analysis/promptAnalyzer";
+import { buildSource } from "../tool/code/buildSource";
 import { enhancePrompt } from "../tool/code/enhancePrompt";
 import { plannerPromptTool } from "../tool/code/plannerPrompt";
-import { getContext } from "../tool/dry/getContext";
-import { toolExecutor } from "../workflow/tools";
 import { validateBuild } from "../tool/code/validateBuild";
+import { getContext } from "../tool/dry/getContext";
 import { saveContext } from "../tool/dry/saveContext";
-import { buildSource } from "../tool/code/buildSource";
 import { testBuild } from "../tool/dry/testBuild";
 import { pushFilesToR2 } from "../tool/r2PullPush/push";
+import { toolExecutor } from "../workflow/tools";
 
 export const GraphAnnotation = Annotation.Root({
   projectId: Annotation<string>(),
   prompt: Annotation<string>(),
   analysis: Annotation<any>(),
   enhancedPrompt: Annotation<string>(),
-  plan: Annotation<string>(),
+  generatedPlan: Annotation<string>(),
   context: Annotation<any>(),
   toolResults: Annotation<any[]>(),
   buildStatus: Annotation<string>(),
@@ -23,59 +24,133 @@ export const GraphAnnotation = Annotation.Root({
   completed: Annotation<boolean>({ reducer: (a, b) => b, default: () => false }),
   error: Annotation<string>(),
   pushResult: Annotation<any>(),
+  clientId: Annotation<string>(),
+  accumulatedResponses: Annotation<string[]>({ reducer: (a, b) => [...a, ...b], default: () => [] }),
 });
 
 type GraphState = typeof GraphAnnotation.State;
 
 async function analyzePrompt(state: GraphState): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, { type: "analyzing", message: "Analyzing prompt..." });
   const result = await promptAnalyzer.invoke({ prompt: state.prompt, projectId: state.projectId });
   return { analysis: result.analysis };
 }
 
-async function enhancePromptNode(state: GraphState): Promise<Partial<GraphState>> {
+async function enhancePromptNode(
+  state: GraphState,
+): Promise<Partial<GraphState>> {
   let enhanced = state.prompt;
   if (state.analysis?.needsEnhancement) {
-    const result = await enhancePrompt.invoke({ prompt: state.prompt, contextInfo: JSON.stringify(state.analysis) });
-    enhanced = result.success ? (result.enhancedPrompt || state.prompt) : state.prompt;
+    sendSSEMessage(state.clientId, {
+      type: "enhancing",
+      message: "Enhancing prompt...",
+    });
+    const result = await enhancePrompt.invoke({
+      prompt: state.prompt,
+      contextInfo: JSON.stringify(state.analysis),
+    });
+    enhanced = result.success
+      ? result.enhancedPrompt || state.prompt
+      : state.prompt;
+    if (result.success && result.enhancedPrompt) {
+      return { enhancedPrompt: enhanced, accumulatedResponses: [`Enhanced Prompt: ${result.enhancedPrompt}`] };
+    }
   }
   return { enhancedPrompt: enhanced };
 }
 
 async function planChanges(state: GraphState): Promise<Partial<GraphState>> {
-  const result = await plannerPromptTool.invoke({ prompt: state.enhancedPrompt, contextInfo: JSON.stringify(state.context) });
+  sendSSEMessage(state.clientId, {
+    type: "planning",
+    message: "Planning changes...",
+  });
+  const result = await plannerPromptTool.invoke({
+    prompt: state.enhancedPrompt,
+    contextInfo: JSON.stringify(state.context),
+  });
   const plan = result.success ? result.plan : "Default plan";
-  return { plan };
+  return { generatedPlan: plan, accumulatedResponses: result.success ? [`Planning: ${result.plan}`] : [] };
 }
 
-async function getProjectContext(state: GraphState): Promise<Partial<GraphState>> {
+async function getProjectContext(
+  state: GraphState,
+): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "context",
+    message: "Getting project context...",
+  });
   const result = await getContext.invoke({ projectId: state.projectId });
   const context = result.context;
   return { context };
 }
 
 async function executeTools(state: GraphState): Promise<Partial<GraphState>> {
-  const result = await toolExecutor.invoke({
-    projectId: state.projectId,
-    toolName: "executePlan",
-    toolInput: { plan: state.plan, context: state.context }
+  sendSSEMessage(state.clientId, {
+    type: "executing",
+    message: "Executing tools...",
   });
+
+  // Import model and tools
+  const { model } = await import("../../agent/client");
+  const { SYSTEM_PROMPTS } = await import("../../prompt/systemPrompt");
+  const tools = await import("../tool/index");
+
+  // Create model with tools
+  const modelWithTools = model.bindTools(Object.values(tools));
+
+  // Execute the plan using the model with tools
+  const result = await modelWithTools.invoke([
+    {
+      role: "system",
+      content: SYSTEM_PROMPTS.BUILDER_PROMPT,
+    },
+    {
+      role: "user",
+      content: `Execute this plan: ${state.generatedPlan}\n\nContext: ${JSON.stringify(state.context)}`,
+    },
+  ]);
+
   const { stateManager } = await import("../state/manager");
   stateManager.incrementIteration(state.projectId);
-  return { toolResults: [result], iterations: state.iterations + 1 };
+  const executionSummary = `Execution Results: ${result.tool_calls?.length || 0} tools executed`;
+  return { toolResults: [result], iterations: state.iterations + 1, accumulatedResponses: [executionSummary] };
 }
 
-async function validateBuildNode(state: GraphState): Promise<Partial<GraphState>> {
-  const result = await validateBuild.invoke({ projectId: state.projectId, userInstructions: state.prompt });
+async function validateBuildNode(
+  state: GraphState,
+): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "validating",
+    message: "Validating build...",
+  });
+  const result = await validateBuild.invoke({
+    projectId: state.projectId,
+    userInstructions: state.prompt,
+  });
   const status = result.success ? "success" : "failed";
   return { buildStatus: status };
 }
 
 async function testBuildNode(state: GraphState): Promise<Partial<GraphState>> {
-  const result = await testBuild.invoke({ action: "build", cwd: state.projectId });
-  return { buildStatus: result.success ? "tested" : "errors", error: result.stderr || result.error };
+  sendSSEMessage(state.clientId, {
+    type: "testing",
+    message: "Testing build...",
+  });
+  const result = await testBuild.invoke({
+    action: "build",
+    cwd: state.projectId,
+  });
+  return {
+    buildStatus: result.success ? "tested" : "errors",
+    error: result.stderr || result.error,
+  };
 }
 
 async function fixErrorsNode(state: GraphState): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "fixing",
+    message: "Fixing errors...",
+  });
   // Get updated context before fixing
   const contextResult = await getContext.invoke({ projectId: state.projectId });
   const updatedContext = contextResult.context;
@@ -83,25 +158,56 @@ async function fixErrorsNode(state: GraphState): Promise<Partial<GraphState>> {
   const result = await toolExecutor.invoke({
     projectId: state.projectId,
     toolName: "fixErrors",
-    toolInput: { error: state.error, context: updatedContext }
+    toolInput: { error: state.error, context: updatedContext },
   });
   return { context: updatedContext, toolResults: [result] };
 }
 
 async function pushToR2Node(state: GraphState): Promise<Partial<GraphState>> {
-  const result = await pushFilesToR2.invoke({ projectId: state.projectId, bucketName: "elbavol" });
+  sendSSEMessage(state.clientId, {
+    type: "pushing",
+    message: "Pushing to storage...",
+  });
+  const result = await pushFilesToR2.invoke({
+    projectId: state.projectId,
+    bucketName: "elbavol",
+  });
   return { pushResult: result };
 }
 
-async function saveContextNode(state: GraphState): Promise<Partial<GraphState>> {
-  await saveContext.invoke({ context: state.context, filePath: `${state.projectId}/context.json` });
+async function saveContextNode(
+  state: GraphState,
+): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "saving",
+    message: "Saving context...",
+  });
+  await saveContext.invoke({
+    context: state.context,
+    filePath: `${state.projectId}/context.json`,
+  });
   const { stateManager } = await import("../state/manager");
   stateManager.setStatus(state.projectId, "completed");
   return { completed: true };
 }
 
 async function runAppNode(state: GraphState): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, { type: "running", message: "Running application..." });
   await buildSource.invoke({ projectId: state.projectId });
+
+  const { producer } = await import("../../index");
+  const { MESSAGE_KEYS, TOPIC } = await import("@elbavol/constants");
+
+  await producer.send({
+    topic: TOPIC.CONTROL_TO_SERVING,
+    messages: [
+      {
+        key: state.projectId,
+        value: JSON.stringify({ key: MESSAGE_KEYS.PROJECT_RUN, projectId: state.projectId }),
+      },
+    ],
+  });
+
   return {};
 }
 

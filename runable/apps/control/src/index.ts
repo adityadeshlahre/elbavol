@@ -286,7 +286,9 @@ async function start() {
           if (value.startsWith("PROMPT|")) {
             const parts = value.split("|");
             if (parts.length < 2 || !parts[1]) {
-              console.log(`Invalid prompt format for project ${projectId}: ${value}`);
+              console.log(
+                `Invalid prompt format for project ${projectId}: ${value}`,
+              );
               break;
             }
             const prompt = parts[1].trim();

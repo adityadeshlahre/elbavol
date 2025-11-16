@@ -68,7 +68,7 @@ func ChatMessageHandler(c echo.Context) error {
 		return c.String(500, "Failed to send message")
 	}
 
-	// Await response
+	// Await SSE URL response
 	ctx := context.Background()
 	for {
 		msg, err := clients.KafkaReceiverClientFromOrchestrator.Reader.ReadMessage(ctx)
@@ -77,22 +77,23 @@ func ChatMessageHandler(c echo.Context) error {
 			return c.String(500, "Failed to read response")
 		}
 		responseId := string(msg.Key)
-		response := string(msg.Value)
+		sseUrl := string(msg.Value)
 
-		if responseId == projectId && response != "" {
+		if responseId == projectId && sseUrl != "" {
 			go func() {
 				file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY, 0644)
 				if err != nil {
-					log.Printf("Failed to open file for response in project %s: %v", projectId, err)
+					log.Printf("Failed to open file for SSE URL in project %s: %v", projectId, err)
 					return
 				}
-				defer file.Close()
 
-				if _, err := file.WriteString("AGENT_RESPONSE : \"" + response + "\"\n"); err != nil {
-					log.Printf("Failed to write response to file for project %s: %v", projectId, err)
+				if _, err := file.WriteString("SSE_URL : \"" + sseUrl + "\"\n"); err != nil {
+					log.Printf("Failed to write SSE URL to file for project %s: %v", projectId, err)
 				}
+
+				defer file.Close()
 			}()
-			return c.String(200, response)
+			return c.JSON(200, map[string]string{"sseUrl": sseUrl})
 		}
 	}
 }

@@ -53,7 +53,8 @@ export const getContext = tool(
   },
   {
     name: "getContext",
-    description: "Retrieves project context including file structure, dependencies, and key files.",
+    description:
+      "Retrieves project context including file structure, dependencies, and key files.",
     schema: getContextInput,
   },
 );

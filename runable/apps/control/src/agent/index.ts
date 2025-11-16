@@ -4,7 +4,7 @@ export type {
   ProjectContext,
   WorkflowConfig,
 } from "@elbavol/types";
-export { mainGraph, GraphAnnotation, createMainGraph } from "./graphs/main";
+export { createMainGraph, GraphAnnotation, mainGraph } from "./graphs/main";
 export { agentHandler } from "./handler";
 export { stateManager } from "./state/manager";
 export { workflowEngine } from "./workflow/engine";

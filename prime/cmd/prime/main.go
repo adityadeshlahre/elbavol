@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/adityadeshlahre/elbavol/prime/clients"
 	"github.com/adityadeshlahre/elbavol/prime/response"
@@ -45,7 +47,21 @@ func main() {
 					log.Printf("Channel was closed for project %s", projectId)
 				}
 			} else {
-				log.Printf("No waiting channel found for project %s", projectId)
+				if strings.HasPrefix(response, "AI_RESPONSE: ") {
+					file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+					if err != nil {
+						log.Printf("Failed to open file for project %s: %v", projectId, err)
+						return
+					}
+					defer file.Close()
+
+					if _, err := file.WriteString(response + "\n"); err != nil {
+						log.Printf("Failed to write AI response to file for project %s: %v", projectId, err)
+					}
+					log.Printf("Saved AI response for project %s", projectId)
+				} else {
+					log.Printf("No waiting channel found for project %s", projectId)
+				}
 			}
 		}
 	}()

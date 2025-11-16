@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"strings"
 
 	"github.com/adityadeshlahre/elbavol/orchestrator/k8s"
 	kafkaShared "github.com/adityadeshlahre/elbavol/shared/kafka"
@@ -89,22 +90,31 @@ func ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubH
 		return
 	}
 
-	// Await response from control pod
+	// Await SSE URL from control pod
 	ch := make(chan string, 1)
 	ControlResponses[projectId] = ch
 	payload := <-ch
 
+	// Parse "PROMPT_RESPONSE|<sseUrl>"
+	parts := strings.Split(payload, "|")
+	var sseUrl string
+	if len(parts) >= 2 && parts[0] == sharedTypes.PROMPT_RESPONSE {
+		sseUrl = parts[1]
+	} else {
+		sseUrl = payload // fallback
+	}
+
 	err = senderToBackend.WriteMessage(
 		[]byte(projectId),
-		[]byte(payload),
+		[]byte(sseUrl),
 	)
 
 	if err != nil {
-		log.Printf("Failed to send LLM response to backend: %v", err)
+		log.Printf("Failed to send SSE URL to backend: %v", err)
 		return
 	}
 
-	log.Printf("Sent LLM response back to backend for project %s", projectId)
+	log.Printf("Sent SSE URL back to backend for project %s", projectId)
 }
 
 func BuildProjectHandler(

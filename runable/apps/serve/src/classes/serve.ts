@@ -83,7 +83,7 @@ export const serveTheProject = async (
 
   console.log(`Starting server for project ${projectId} on port ${port}`);
 
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 
   const checkProc = Bun.spawn(["nc", "-z", "localhost", port.toString()], {
     // TODO: i think this needs to be changed to something else on production

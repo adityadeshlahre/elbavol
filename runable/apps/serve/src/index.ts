@@ -161,7 +161,13 @@ async function start() {
               await producer.send({
                 topic: TOPIC.SERVING_TO_ORCHESTRATOR,
                 messages: [
-                  { key: projectId, value: JSON.stringify({ key: MESSAGE_KEYS.PROJECT_CREATED, projectId }) },
+                  {
+                    key: projectId,
+                    value: JSON.stringify({
+                      key: MESSAGE_KEYS.PROJECT_CREATED,
+                      projectId,
+                    }),
+                  },
                 ],
               });
 

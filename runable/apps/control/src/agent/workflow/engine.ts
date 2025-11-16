@@ -1,6 +1,10 @@
 import type { AgentResponse, AgentState, WorkflowConfig } from "@elbavol/types";
 import { HumanMessage } from "@langchain/core/messages";
+import { randomUUID } from "crypto";
+import { producer } from "../../index";
+import { TOPIC } from "@elbavol/constants";
 import { SYSTEM_PROMPTS } from "../../prompt/systemPrompt";
+import { getSSEUrl, sendSSEMessage, startSSEServer } from "../../SSE";
 import { mainGraph } from "../graphs/main";
 import { stateManager } from "../state/manager";
 
@@ -53,42 +57,77 @@ class WorkflowEngine {
     config: WorkflowConfig,
   ): Promise<AgentResponse> {
     const { projectId } = initialState;
+    const clientId = randomUUID();
+
+    // Start SSE server if not already
+    startSSEServer();
+
+    // Send initial SSE message
+    sendSSEMessage(clientId, {
+      type: "started",
+      message: "Processing prompt...",
+    });
 
     try {
       const finalState = await mainGraph.invoke({
         projectId,
         prompt: initialState.currentTask,
         iterations: 0,
+        clientId,
+        accumulatedResponses: [],
       });
 
       // Update stateManager with final status
       if (finalState.completed) {
         stateManager.setStatus(projectId, "completed");
+        sendSSEMessage(clientId, {
+          type: "completed",
+          message: "Project updated successfully",
+          result: finalState,
+        });
+        // Send accumulated AI responses to save in file
+        const aiResponse = finalState.accumulatedResponses?.join('\n\n') || 'No AI responses generated';
+        await producer.send({
+          topic: TOPIC.ORCHESTRATOR_TO_PRIME,
+          messages: [{ key: projectId, value: `AI_RESPONSE: ${aiResponse}` }],
+        });
       } else {
         stateManager.setStatus(projectId, "error");
+        sendSSEMessage(clientId, {
+          type: "error",
+          message: "Failed to complete the task",
+          error: finalState.error,
+        });
       }
+
+      const sseUrl = getSSEUrl(clientId);
 
       if (finalState.completed) {
         return {
           success: true,
-          result: "Project updated successfully",
+          result: sseUrl, // Return SSE URL instead of result
           state: stateManager.getState(projectId)!,
-          iterations: finalState.iterations,
-        };
-      } else {
-        return {
-          success: false,
-          result: "Failed to complete the task",
-          state: stateManager.getState(projectId)!,
-          error: finalState.error || "Unknown error",
           iterations: finalState.iterations,
         };
       }
-    } catch (error) {
-      stateManager.setStatus(projectId, "error");
       return {
         success: false,
-        result: "Maximum iterations reached without completion",
+        result: sseUrl,
+        state: stateManager.getState(projectId)!,
+        error: finalState.error || "Unknown error",
+        iterations: finalState.iterations,
+      };
+    } catch (error) {
+      stateManager.setStatus(projectId, "error");
+      sendSSEMessage(clientId, {
+        type: "error",
+        message: "Workflow failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      const sseUrl = getSSEUrl(clientId);
+      return {
+        success: false,
+        result: sseUrl,
         state: stateManager.getState(projectId)!,
         error: error instanceof Error ? error.message : String(error),
         iterations: 0,

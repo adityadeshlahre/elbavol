@@ -4,10 +4,8 @@ import { model } from "@/agent/client";
 import { SYSTEM_PROMPTS } from "@/prompt/systemPrompt";
 
 const plannerPromptInput = z.object({
-  prompt: z
-    .string()
-    .min(1, "Prompt is required"),
-    // .max(500, "Prompt is too long"),
+  prompt: z.string().min(1, "Prompt is required"),
+  // .max(500, "Prompt is too long"),
   contextInfo: z.string().optional(),
 });
 
