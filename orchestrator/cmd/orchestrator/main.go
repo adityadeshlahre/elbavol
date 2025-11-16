@@ -14,6 +14,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type ServingResponse struct {
+	Key       string `json:"key"`
+	ProjectId string `json:"projectId"`
+}
+
 var KafkaReceiverClientFromBackend *kafkaShared.KafkaClientReader
 var KafkaSenderClientToBackend *kafkaShared.KafkaClientWriter
 var KafkaReceiverClientFromControl *kafkaShared.KafkaClientReader
@@ -52,13 +57,18 @@ func main() {
 				continue
 			}
 			pId := string(msg.Key)
-			response := string(msg.Value)
 
-			log.Printf("Received message from serving pod for project %s: %s", pId, response)
+			var resp ServingResponse
+			if err := json.Unmarshal(msg.Value, &resp); err != nil {
+				log.Printf("Failed to parse serving message for project %s: %v", pId, err)
+				continue
+			}
+
+			log.Printf("Received message from serving pod for project %s: %s", pId, resp.Key)
 
 			if ch, ok := handlers.ServerResponses[pId]; ok {
 				select {
-				case ch <- response:
+				case ch <- resp.Key:
 					log.Printf("Sent response to waiting channel for project %s", pId)
 				default:
 					log.Printf("No waiting channel or channel closed for project %s", pId)
@@ -66,7 +76,7 @@ func main() {
 				delete(handlers.ServerResponses, pId)
 			}
 
-			switch response {
+			switch resp.Key {
 			case sharedTypes.PROJECT_CREATED:
 				log.Printf("Forwarding PROJECT_CREATED to backend for project %s", pId)
 				err := KafkaSenderClientToBackend.WriteMessage([]byte(pId), []byte(sharedTypes.PROJECT_CREATED))
@@ -105,7 +115,7 @@ func main() {
 				}
 
 			default:
-				log.Printf("Unknown response from serving pod for project %s: %s", pId, response)
+				log.Printf("Unknown response from serving pod for project %s: %s", pId, resp.Key)
 			}
 		}
 	}()
@@ -119,18 +129,28 @@ func main() {
 			}
 			responseId := string(msg.Key)
 			response := string(msg.Value)
-			sepIndex := strings.Index(response, "|")
-			if sepIndex == -1 {
-				continue
-			}
-			header := strings.TrimSpace(response[:sepIndex])
-			payload := strings.TrimSpace(response[sepIndex+1:])
-			if strings.Contains(header, sharedTypes.PROMPT_RESPONSE) {
-				if ch, ok := handlers.ControlResponses[responseId]; ok {
-					ch <- payload
-					delete(handlers.ControlResponses, responseId)
+			header := response
+			payload := ""
+
+			var resp ServingResponse
+			if err := json.Unmarshal(msg.Value, &resp); err == nil {
+				responseId = resp.ProjectId
+				response = resp.Key
+			} else {
+				sepIndex := strings.Index(response, "|")
+				if sepIndex != -1 {
+					header = strings.TrimSpace(response[:sepIndex])
+					payload = strings.TrimSpace(response[sepIndex+1:])
+					if strings.Contains(header, sharedTypes.PROMPT_RESPONSE) {
+						if ch, ok := handlers.ControlResponses[responseId]; ok {
+							ch <- payload
+							delete(handlers.ControlResponses, responseId)
+						}
+						continue
+					}
 				}
 			}
+
 			switch response {
 			case sharedTypes.PROMPT_RESPONSE:
 				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROMPT_RESPONSE+"|"+payload))

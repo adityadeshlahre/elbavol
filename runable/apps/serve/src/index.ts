@@ -161,7 +161,7 @@ async function start() {
               await producer.send({
                 topic: TOPIC.SERVING_TO_ORCHESTRATOR,
                 messages: [
-                  { key: projectId, value: MESSAGE_KEYS.PROJECT_CREATED },
+                  { key: projectId, value: JSON.stringify({ key: MESSAGE_KEYS.PROJECT_CREATED, projectId }) },
                 ],
               });
 
@@ -206,7 +206,7 @@ async function start() {
           }
           break;
 
-        case MESSAGE_KEYS.PROJECT_RUN:
+        case MESSAGE_KEYS.PROJECT_RUN: // TODO: is this even needed here?
           if (projectId) {
             console.log(`Fetching and serving project ${projectId}`);
             if (!checkIfProjectFilesExist(projectId)) return;
@@ -215,9 +215,10 @@ async function start() {
             projectRunning = true;
           }
           break;
+
         default:
           console.log(
-            `Received unknown message: ${value} for project: ${projectId}`,
+            `Received unknown message: ${value} for project: ${projectId} from control pod`,
           );
           break;
       }
@@ -238,9 +239,19 @@ async function start() {
       if (!projectId || !value) return;
 
       switch (value) {
+        case MESSAGE_KEYS.PROJECT_RUN:
+          if (projectId) {
+            console.log(`Fetching and serving project ${projectId}`);
+            if (!checkIfProjectFilesExist(projectId)) return;
+            await serveTheProject(projectId, producer);
+            console.log(`Project ${projectId} is now running.`);
+            projectRunning = true;
+          }
+          break;
+
         default:
           console.log(
-            `Received unknown message: ${value} for project: ${projectId}`,
+            `Received unknown message: ${value} for project: ${projectId} from orchestrator`,
           );
           break;
       }

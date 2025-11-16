@@ -15,7 +15,7 @@ export const buildProjectAndNotifyToRun = async (
 
   if (!fs.existsSync(dir)) {
     await producer.send({
-      topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
       messages: [
         {
           value: JSON.stringify({
@@ -32,7 +32,7 @@ export const buildProjectAndNotifyToRun = async (
   const packageJsonPath = path.join(dir, "package.json");
   if (!fs.existsSync(packageJsonPath)) {
     await producer.send({
-      topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
       messages: [
         {
           value: JSON.stringify({
@@ -57,7 +57,7 @@ export const buildProjectAndNotifyToRun = async (
     if (installCode !== 0) {
       const error = await new Response(installProc.stderr).text();
       await producer.send({
-        topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
         messages: [
           {
             value: JSON.stringify({
@@ -81,7 +81,7 @@ export const buildProjectAndNotifyToRun = async (
     if (buildCode !== 0) {
       const error = await new Response(buildProc.stderr).text();
       await producer.send({
-        topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
         messages: [
           {
             value: JSON.stringify({
@@ -96,7 +96,7 @@ export const buildProjectAndNotifyToRun = async (
     }
 
     await producer.send({
-      topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
       messages: [
         {
           value: JSON.stringify({
@@ -107,20 +107,23 @@ export const buildProjectAndNotifyToRun = async (
       ],
     });
 
-    await producer.send({
-      topic: TOPIC.CONTROL_TO_SERVING,
-      messages: [
-        {
-          key: projectId,
-          value: MESSAGE_KEYS.PROJECT_RUN,
-        },
-      ],
-    });
+    // await producer.send({
+    //   topic: TOPIC.CONTROL_TO_SERVING,
+    //   messages: [
+    //     {
+    //       key: projectId,
+    //       value: JSON.stringify({
+    //         key: MESSAGE_KEYS.PROJECT_RUN,
+    //         projectId,
+    //       }),
+    //     },
+    //   ],
+    // }); // TODO: May be needed later do not remove krda yrr
 
     return true;
   } catch (error) {
     await producer.send({
-      topic: TOPIC.SERVING_TO_ORCHESTRATOR,
+      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
       messages: [
         {
           value: JSON.stringify({

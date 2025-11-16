@@ -139,32 +139,32 @@ func BuildProjectHandler(
 		}
 	}
 
-	err = senderToServing.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
-	if err != nil {
-		log.Printf("Failed to send PROJECT_BUILD message to serving pod for project %s: %v", projectId, err)
-		return err
-	}
+	// err = senderToServing.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
+	// if err != nil {
+	// 	log.Printf("Failed to send PROJECT_BUILD message to serving pod for project %s: %v", projectId, err)
+	// 	return err
+	// }
 
-	ch = make(chan string, 1)
-	ControlResponses[projectId] = ch
-	payload = <-ch
+	// ch = make(chan string, 1)
+	// ServerResponses[projectId] = ch
+	// payload = <-ch
 
-	if payload != sharedTypes.PROJECT_RUN_SUCCESS {
-		log.Printf("Project run failed for project %s: %s", projectId, payload)
-		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_FAILED))
-		if err != nil {
-			log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", projectId, err)
-		}
-		return err
-	} else {
-		log.Printf("Project run succeeded for project %s", projectId)
-		err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN_SUCCESS))
-		if err != nil {
-			log.Printf("Failed to send PROJECT_RUN_SUCCESS message to backend for project %s: %v", projectId,
-				err)
-			return err
-		}
-	}
+	// if payload != sharedTypes.PROJECT_RUN_SUCCESS {
+	// 	log.Printf("Project run failed for project %s: %s", projectId, payload)
+	// 	err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_FAILED))
+	// 	if err != nil {
+	// 		log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", projectId, err)
+	// 	}
+	// 	return err
+	// } else {
+	// 	log.Printf("Project run succeeded for project %s", projectId)
+	// 	err = senderToBackend.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN_SUCCESS))
+	// 	if err != nil {
+	// 		log.Printf("Failed to send PROJECT_RUN_SUCCESS message to backend for project %s: %v", projectId,
+	// 			err)
+	// 		return err
+	// 	}
+	// }
 
 	log.Printf("Sent PROJECT_BUILD message to serving pod for project %s", projectId)
 	return nil
@@ -182,7 +182,7 @@ func RunProjectHandler(
 	}
 
 	ch := make(chan string, 1)
-	ControlResponses[projectId] = ch
+	ServerResponses[projectId] = ch
 	payload := <-ch
 
 	if payload != sharedTypes.PROJECT_RUN_SUCCESS {

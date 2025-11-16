@@ -36,6 +36,9 @@ func BuildHandler(c echo.Context) error {
 	case response := <-ch:
 		log.Printf("Received build response for project %s: %s", projectId, response)
 		switch response {
+		case sharedTypes.PROJECT_FAILED:
+			log.Printf("Build failed for project %s", projectId)
+			return c.String(500, "build failed")
 		case sharedTypes.PROJECT_BUILD_SUCCESS:
 			log.Printf("Build succeeded for project %s", projectId)
 			err = clients.KafkaSenderClientToOrchestrator.WriteMessage([]byte(projectId), []byte(sharedTypes.PROJECT_RUN))
@@ -52,16 +55,12 @@ func BuildHandler(c echo.Context) error {
 			case runResponse := <-ch:
 				log.Printf("Received run response for project %s: %s", projectId, runResponse)
 				switch runResponse {
+				case sharedTypes.PROJECT_FAILED:
+					log.Printf("Run failed for project %s", projectId)
+					return c.String(500, "run failed")
 				case sharedTypes.PROJECT_RUN_SUCCESS:
 					return c.String(200, fmt.Sprintf("%s.localhost:3000", projectId))
 				case sharedTypes.PROJECT_RUN_FAILED:
-					log.Printf("Run failed for project %s", projectId)
-					errorMsg := "unknown error"
-					if idx := strings.Index(runResponse, "|"); idx != -1 {
-						errorMsg = runResponse[idx+1:]
-					}
-					return c.String(500, "run failed: "+errorMsg)
-				case sharedTypes.PROJECT_FAILED:
 					log.Printf("Run failed for project %s", projectId)
 					errorMsg := "unknown error"
 					if idx := strings.Index(runResponse, "|"); idx != -1 {

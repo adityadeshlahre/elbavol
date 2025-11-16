@@ -14,6 +14,7 @@ export const pushProjectInitializationToServingPod = async (
           key: projectId,
           value: JSON.stringify({
             key: MESSAGE_KEYS.SERVING_PROJECT_INITIALIZED,
+            projectId,
           }),
         },
       ],
@@ -31,19 +32,9 @@ export const waitForProjectInitializationConfirmation = async (
   projectId: string,
 ): Promise<{ projectId: string }> => {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      processing.delete(projectId);
-      reject(
-        new Error(
-          `Timeout waiting for project initialization confirmation for ${projectId}`,
-        ),
-      );
-    }, 5000);
-
     processing.set(
       projectId,
       (value: { success: boolean; payload?: string | undefined }) => {
-        clearTimeout(timeout);
         processing.delete(projectId);
 
         if (value.success && value.payload) {
