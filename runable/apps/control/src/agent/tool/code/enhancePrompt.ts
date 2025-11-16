@@ -2,6 +2,8 @@ import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
 import { SYSTEM_PROMPTS } from "@/prompt";
+import type { GraphState } from "@/agent/graphs/main";
+import { sendSSEMessage } from "@/sse";
 
 export const enhancePromptInput = z.object({
   prompt: z.string().min(1, "Prompt is required"),
@@ -45,3 +47,29 @@ export const enhancePrompt = tool(
     schema: enhancePromptInput,
   },
 );
+
+export async function enhancePromptNode(
+  state: GraphState,
+): Promise<Partial<GraphState>> {
+  let enhanced = state.prompt;
+  if (state.analysis?.needsEnhancement) {
+    sendSSEMessage(state.clientId, {
+      type: "enhancing",
+      message: "Enhancing prompt...",
+    });
+    const result = await enhancePrompt.invoke({
+      prompt: state.prompt,
+      contextInfo: JSON.stringify(state.analysis),
+    });
+    enhanced = result.success
+      ? result.enhancedPrompt || state.prompt
+      : state.prompt;
+    if (result.success && result.enhancedPrompt) {
+      return {
+        enhancedPrompt: enhanced,
+        accumulatedResponses: [`Enhanced Prompt: ${result.enhancedPrompt}`],
+      };
+    }
+  }
+  return { enhancedPrompt: enhanced };
+}

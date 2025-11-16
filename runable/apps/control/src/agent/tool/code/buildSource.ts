@@ -5,6 +5,8 @@ import { tool } from "langchain";
 import path from "path";
 import * as z from "zod";
 import { producer } from "../../../index";
+import { sendSSEMessage } from "@/sse";
+import type { GraphState } from "@/agent/graphs/main";
 
 export const buildProjectAndNotifyToRun = async (
   projectId: string,
@@ -161,3 +163,30 @@ export const buildSource = tool(
     schema: buildSourceInput,
   },
 );
+
+
+export async function runAppNode(state: GraphState): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "running",
+    message: "Running application...",
+  });
+  await buildSource.invoke({ projectId: state.projectId });
+
+  const { MESSAGE_KEYS, TOPIC } = await import("@elbavol/constants");
+
+  await producer.send({
+    topic: TOPIC.CONTROL_TO_SERVING,
+    messages: [
+      {
+        key: state.projectId,
+        value: JSON.stringify({
+          key: MESSAGE_KEYS.PROJECT_RUN,
+          projectId: state.projectId,
+        }),
+      },
+    ],
+  });
+
+  return {};
+}
+

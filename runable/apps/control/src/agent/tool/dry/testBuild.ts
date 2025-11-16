@@ -1,3 +1,5 @@
+import type { GraphState } from "@/agent/graphs/main";
+import { sendSSEMessage } from "@/sse";
 import { tool } from "langchain";
 import * as z from "zod";
 
@@ -43,3 +45,19 @@ export const testBuild = tool(
     schema: testBuildInput,
   },
 );
+
+
+export async function testBuildNode(state: GraphState): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "testing",
+    message: "Testing build...",
+  });
+  const result = await testBuild.invoke({
+    action: "build",
+    cwd: state.projectId,
+  });
+  return {
+    buildStatus: result.success ? "tested" : "errors",
+    error: result.stderr || result.error,
+  };
+}

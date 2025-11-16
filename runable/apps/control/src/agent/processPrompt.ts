@@ -8,28 +8,53 @@ export async function processPrompt(
   projectId: string,
   prompt: string,
   producer: Producer,
+  clientId?: string,
 ): Promise<void> {
   console.log(`Starting agent processing for project ${projectId}: ${prompt}`);
 
   try {
     startSSEServer();
 
-    const clientId = randomUUID();
-    sendSSEMessage(clientId, {
+    const clientIdUsed = clientId || randomUUID();
+    sendSSEMessage(clientIdUsed, {
       type: "started",
       message: "Processing prompt...",
     });
 
-    const finalState = await mainGraph.invoke({
-      projectId,
-      prompt: prompt,
-      iterations: 0,
-      clientId,
-      accumulatedResponses: [],
-    });
+    let finalState;
+    try {
+      finalState = await mainGraph.invoke({
+        projectId,
+        prompt: prompt,
+        iterations: 0,
+        clientId: clientIdUsed,
+        accumulatedResponses: [],
+      }, { configurable: { thread_id: projectId } });
+    } catch (graphError) {
+      console.error(`Graph execution error for project ${projectId}:`, graphError);
+      sendSSEMessage(clientIdUsed, {
+        type: "error",
+        message: "Graph execution failed",
+        error: graphError instanceof Error ? graphError.message : String(graphError),
+      });
+
+      await producer.send({
+        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+        messages: [
+          {
+            key: projectId,
+            value:
+              MESSAGE_KEYS.PROMPT_RESPONSE +
+              "|" +
+              (graphError instanceof Error ? graphError.message : String(graphError)),
+          },
+        ],
+      });
+      return;
+    }
 
     if (finalState.completed) {
-      sendSSEMessage(clientId, {
+      sendSSEMessage(clientIdUsed, {
         type: "completed",
         message: "Project updated successfully",
         result: finalState,
@@ -50,7 +75,7 @@ export async function processPrompt(
         messages: [
           {
             key: projectId,
-            value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + clientId,
+            value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + clientIdUsed,
           },
         ],
       });
@@ -70,7 +95,7 @@ export async function processPrompt(
         });
       }
     } else {
-      sendSSEMessage(clientId, {
+      sendSSEMessage(clientIdUsed, {
         type: "error",
         message: "Failed to complete the task",
         error: finalState.error,

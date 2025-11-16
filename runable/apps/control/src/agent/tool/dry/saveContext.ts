@@ -1,3 +1,5 @@
+import type { GraphState } from "@/agent/graphs/main";
+import { sendSSEMessage } from "@/sse";
 import fs from "fs";
 import { tool } from "langchain";
 import path from "path";
@@ -30,3 +32,17 @@ export const saveContext = tool(
     schema: saveContextInput,
   },
 );
+
+export async function saveContextNode(
+  state: GraphState,
+): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "saving",
+    message: "Saving context...",
+  });
+  await saveContext.invoke({
+    context: state.context,
+    filePath: `${state.projectId}/context.json`,
+  });
+  return { completed: true };
+}

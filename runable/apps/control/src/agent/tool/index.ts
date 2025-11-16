@@ -1,5 +1,6 @@
 export { promptAnalyzer } from "./analysis/promptAnalyzer";
 export { buildSource } from "./code/buildSource";
+export { checkUserGivenPrompt } from "./code/userGivenPromptChecker";
 export { validateBuild } from "./code/validateBuild";
 export { addDependency, removeDependency } from "./dry/addAndRemoveDependency";
 export { checkMissingPackage } from "./dry/checkMissingPackage";

@@ -1,6 +1,8 @@
 import { tool } from "langchain";
 import * as z from "zod";
 import { SYSTEM_PROMPTS } from "../../../prompt";
+import type { GraphState } from "@/agent/graphs/main";
+import { sendSSEMessage } from "@/sse";
 
 const promptAnalyzerInput = z.object({
   prompt: z.string(),
@@ -40,6 +42,18 @@ export const promptAnalyzer = tool(
     schema: promptAnalyzerInput,
   },
 );
+
+export async function analyzePrompt(state: GraphState): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "analyzing",
+    message: "Analyzing prompt...",
+  });
+  const result = await promptAnalyzer.invoke({
+    prompt: state.prompt,
+    projectId: state.projectId,
+  });
+  return { analysis: result.analysis };
+}
 
 function analyzeIntent(prompt: string): string {
   const lowerPrompt = prompt.toLowerCase();

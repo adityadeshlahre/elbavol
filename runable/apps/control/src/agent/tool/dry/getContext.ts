@@ -1,3 +1,5 @@
+import type { GraphState } from "@/agent/graphs/main";
+import { sendSSEMessage } from "@/sse";
 import fs from "fs";
 import { tool } from "langchain";
 import path from "path";
@@ -58,3 +60,44 @@ export const getContext = tool(
     schema: getContextInput,
   },
 );
+
+
+export async function getProjectContext(
+  state: GraphState,
+): Promise<Partial<GraphState>> {
+  sendSSEMessage(state.clientId, {
+    type: "context",
+    message: "Getting project context...",
+  });
+  const result = await getContext.invoke({ projectId: state.projectId });
+
+  let context = result.context;
+
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const contextPath = path.join(sharedDir, `${state.projectId}/context.json`);
+
+    if (fs.existsSync(contextPath)) {
+      const previousContext = JSON.parse(fs.readFileSync(contextPath, "utf8"));
+      context = {
+        ...previousContext,
+        ...context,
+        metadata: {
+          ...previousContext.metadata,
+          ...context.metadata,
+          lastModified: new Date().toISOString(),
+        },
+      };
+      sendSSEMessage(state.clientId, {
+        type: "context",
+        message: "Loaded previous context and merged",
+      });
+    }
+  } catch (error) {
+    console.warn("Failed to load previous context:", error);
+  }
+
+  return { context };
+}
