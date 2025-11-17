@@ -15,10 +15,13 @@ const writeMultipleFileInput = z.object({
 export const writeMultipleFile = tool(
   async (input: z.infer<typeof writeMultipleFileInput>) => {
     const { files } = writeMultipleFileInput.parse(input);
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
     const results = [];
 
     for (const file of files) {
-      const fullPath = path.resolve("/app/shared", file.path);
+      const fullPath = path.resolve(projectDir, file.path);
       try {
         fs.mkdirSync(path.dirname(fullPath), { recursive: true });
         fs.writeFileSync(fullPath, file.data, "utf8");

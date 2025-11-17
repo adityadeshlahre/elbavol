@@ -1,4 +1,5 @@
 import { tool } from "langchain";
+import path from "path";
 import * as z from "zod";
 
 const executeCommandInput = z.object({
@@ -9,7 +10,10 @@ const executeCommandInput = z.object({
 export const executeCommand = tool(
   async (input: z.infer<typeof executeCommandInput>) => {
     const { command, cwd } = executeCommandInput.parse(input);
-    const workingDir = cwd ? `/app/shared/${cwd}` : "/app/shared";
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const workingDir = cwd ? path.join(projectDir, cwd) : projectDir;
 
     try {
       const proc = Bun.spawn(["sh", "-c", command], {

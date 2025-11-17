@@ -1,4 +1,5 @@
 import { tool } from "langchain";
+import path from "path";
 import * as z from "zod";
 
 const dependencyInput = z.object({
@@ -9,7 +10,10 @@ const dependencyInput = z.object({
 export const addDependency = tool(
   async (input: z.infer<typeof dependencyInput>) => {
     const { packages, cwd } = dependencyInput.parse(input);
-    const workingDir = cwd ? `/app/shared/${cwd}` : "/app/shared";
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const workingDir = cwd ? path.join(projectDir, cwd) : projectDir;
     const command = `bun add ${packages.join(" ")}`;
 
     try {
@@ -42,7 +46,10 @@ export const addDependency = tool(
 export const removeDependency = tool(
   async (input: z.infer<typeof dependencyInput>) => {
     const { packages, cwd } = dependencyInput.parse(input);
-    const workingDir = cwd ? `/app/shared/${cwd}` : "/app/shared";
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const workingDir = cwd ? path.join(projectDir, cwd) : projectDir;
     const command = `bun remove ${packages.join(" ")}`;
 
     try {

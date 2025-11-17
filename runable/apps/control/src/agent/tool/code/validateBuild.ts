@@ -10,6 +10,97 @@ const validateBuildInput = z.object({
   userInstructions: z.string().min(1, "User instructions are required"),
 });
 
+interface BuildError {
+  type: "import" | "typescript" | "syntax" | "missing_file" | "dependency" | "runtime" | "unknown";
+  severity: "critical" | "major" | "minor";
+  message: string;
+  file?: string;
+  line?: number;
+  fixable: boolean;
+}
+
+function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildError[] {
+  const errors: BuildError[] = [];
+  const combinedOutput = stderr + "\n" + stdout;
+  const lines = combinedOutput.split("\n");
+
+  for (const line of lines) {
+    if (line.includes("error") || line.includes("Error") || line.includes("ERROR")) {
+      const error: BuildError = {
+        type: "unknown",
+        severity: "major",
+        message: line.trim(),
+        fixable: true,
+      };
+
+      if (line.includes("Cannot find module") || line.includes("Module not found")) {
+        error.type = "import";
+        error.severity = "critical";
+        error.fixable = true;
+        const match = line.match(/'([^']+)'/);
+        if (match) {
+          error.message = `Cannot find module: ${match[1]}`;
+        }
+      } else if (line.includes("TS") || line.includes("Type") || line.includes("type")) {
+        error.type = "typescript";
+        error.severity = "major";
+        error.fixable = true;
+      } else if (line.includes("SyntaxError") || line.includes("Unexpected token")) {
+        error.type = "syntax";
+        error.severity = "critical";
+        error.fixable = true;
+      } else if (line.includes("ENOENT") || line.includes("no such file")) {
+        error.type = "missing_file";
+        error.severity = "critical";
+        error.fixable = true;
+      } else if (line.includes("Cannot resolve") || line.includes("dependency")) {
+        error.type = "dependency";
+        error.severity = "major";
+        error.fixable = true;
+      } else if (line.includes("ReferenceError") || line.includes("is not defined")) {
+        error.type = "runtime";
+        error.severity = "major";
+        error.fixable = true;
+      }
+
+      const fileMatch = line.match(/([a-zA-Z0-9_\-\/\.]+\.(tsx?|jsx?|css)):(\d+)/);
+      if (fileMatch && fileMatch[1] && fileMatch[3]) {
+        error.file = fileMatch[1];
+        error.line = parseInt(fileMatch[3], 10);
+      }
+
+      errors.push(error);
+    }
+  }
+
+  return errors;
+}
+
+function categorizeBuildResult(errors: BuildError[]) {
+  const critical = errors.filter(e => e.severity === "critical").length;
+  const major = errors.filter(e => e.severity === "major").length;
+  const minor = errors.filter(e => e.severity === "minor").length;
+  const fixable = errors.filter(e => e.fixable).length;
+
+  return {
+    totalErrors: errors.length,
+    criticalCount: critical,
+    majorCount: major,
+    minorCount: minor,
+    fixableCount: fixable,
+    canAttemptFix: fixable > 0 && critical < 10,
+    errorsByType: {
+      import: errors.filter(e => e.type === "import").length,
+      typescript: errors.filter(e => e.type === "typescript").length,
+      syntax: errors.filter(e => e.type === "syntax").length,
+      missing_file: errors.filter(e => e.type === "missing_file").length,
+      dependency: errors.filter(e => e.type === "dependency").length,
+      runtime: errors.filter(e => e.type === "runtime").length,
+      unknown: errors.filter(e => e.type === "unknown").length,
+    },
+  };
+}
+
 export const validateBuild = tool(
   async (input: z.infer<typeof validateBuildInput>) => {
     const { projectId, userInstructions } = validateBuildInput.parse(input);
@@ -93,6 +184,16 @@ export const validateBuild = tool(
                 projectId,
                 userInstructions,
                 buildOutput: stdout,
+                errors: [],
+                errorAnalysis: {
+                  totalErrors: 0,
+                  criticalCount: 0,
+                  majorCount: 0,
+                  minorCount: 0,
+                  fixableCount: 0,
+                  canAttemptFix: false,
+                  errorsByType: {},
+                },
               });
             } else {
               resolve({
@@ -101,16 +202,27 @@ export const validateBuild = tool(
                 projectId,
                 userInstructions,
                 error: "Missing build output directory",
+                errors: [{
+                  type: "missing_file",
+                  severity: "critical",
+                  message: "dist directory not found after build",
+                  fixable: true,
+                }],
               });
             }
           } else {
+            const parsedErrors = parseAndCategorizeBuildErrors(stderr, stdout);
+            const errorAnalysis = categorizeBuildResult(parsedErrors);
+            
             resolve({
               success: false,
-              message: `Build failed with exit code ${code}`,
+              message: `Build failed with ${parsedErrors.length} error(s)`,
               projectId,
               userInstructions,
               error: stderr || "Build failed",
               buildOutput: stdout,
+              errors: parsedErrors,
+              errorAnalysis,
             });
           }
         });
@@ -154,13 +266,44 @@ export async function validateBuildNode(
     type: "validating",
     message: "Validating build...",
   });
+  
   const result = await validateBuild.invoke({
     projectId: state.projectId,
     userInstructions: state.prompt,
-  }) as { success: boolean; message?: string; error?: string };
-  const status = result.success ? "success" : "failed";
+  }) as { 
+    success: boolean; 
+    message?: string; 
+    error?: string;
+    errors?: BuildError[];
+    errorAnalysis?: any;
+  };
+  
+  if (result.success) {
+    sendSSEMessage(state.clientId, {
+      type: "validation_success",
+      message: "Build validation successful - no errors found",
+    });
+    return {
+      buildStatus: "success",
+      buildErrors: [],
+      error: undefined,
+    };
+  }
+  
+  const errorCount = result.errors?.length || 0;
+  const fixableCount = result.errorAnalysis?.fixableCount || 0;
+  
+  sendSSEMessage(state.clientId, {
+    type: "validation_errors",
+    message: `Build validation found ${errorCount} error(s), ${fixableCount} fixable`,
+    errors: result.errors,
+    errorAnalysis: result.errorAnalysis,
+  });
+  
   return {
-    buildStatus: status,
-    error: result.success ? undefined : (result.error || result.message || "Build validation failed"),
+    buildStatus: "errors",
+    buildErrors: result.errors || [],
+    errorAnalysis: result.errorAnalysis,
+    error: result.error || result.message || "Build validation failed",
   };
 }

@@ -1,7 +1,7 @@
 import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import { randomUUID } from "crypto";
 import type { Producer } from "kafkajs";
-import { sendSSEMessage, startSSEServer } from "../sse";
+import { sendSSEMessage, getSSEUrl } from "../sse";
 import { mainGraph } from "./graphs/main";
 
 export async function processPrompt(
@@ -12,14 +12,24 @@ export async function processPrompt(
 ): Promise<void> {
   console.log(`Starting agent processing for project ${projectId}: ${prompt}`);
 
-  try {
-    startSSEServer();
+  const clientIdUsed = clientId || randomUUID();
 
-    const clientIdUsed = clientId || randomUUID();
+  try {
     sendSSEMessage(clientIdUsed, {
       type: "started",
       message: "Processing prompt...",
     });
+
+    await producer.send({
+      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+      messages: [
+        {
+          key: projectId,
+          value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + getSSEUrl(clientIdUsed),
+        },
+      ],
+    });
+    console.log(`Sent SSE URL to orchestrator for project ${projectId}: ${getSSEUrl(clientIdUsed)}`);
 
     let finalState;
     try {
@@ -29,26 +39,16 @@ export async function processPrompt(
         iterations: 0,
         clientId: clientIdUsed,
         accumulatedResponses: [],
-      }, { configurable: { thread_id: projectId } });
+      }, {
+        configurable: { thread_id: projectId },
+        recursionLimit: 1000,
+      });
     } catch (graphError) {
       console.error(`Graph execution error for project ${projectId}:`, graphError);
       sendSSEMessage(clientIdUsed, {
         type: "error",
         message: "Graph execution failed",
         error: graphError instanceof Error ? graphError.message : String(graphError),
-      });
-
-      await producer.send({
-        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-        messages: [
-          {
-            key: projectId,
-            value:
-              MESSAGE_KEYS.PROMPT_RESPONSE +
-              "|" +
-              (graphError instanceof Error ? graphError.message : String(graphError)),
-          },
-        ],
       });
       return;
     }
@@ -69,16 +69,6 @@ export async function processPrompt(
       });
 
       console.log(`Agent completed successfully for project ${projectId}`);
-
-      await producer.send({
-        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-        messages: [
-          {
-            key: projectId,
-            value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + clientIdUsed,
-          },
-        ],
-      });
 
       if (finalState.context?.metadata?.buildStatus === "success") {
         await producer.send({
@@ -102,34 +92,14 @@ export async function processPrompt(
       });
 
       console.error(`Agent failed for project ${projectId}:`, finalState.error);
-
-      await producer.send({
-        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-        messages: [
-          {
-            key: projectId,
-            value:
-              MESSAGE_KEYS.PROMPT_RESPONSE +
-              "|" +
-              (finalState.error || "Unknown error"),
-          },
-        ],
-      });
     }
   } catch (error) {
     console.error(`Agent handler error for project ${projectId}:`, error);
 
-    await producer.send({
-      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-      messages: [
-        {
-          key: projectId,
-          value:
-            MESSAGE_KEYS.PROMPT_RESPONSE +
-            "|" +
-            (error instanceof Error ? error.message : String(error)),
-        },
-      ],
+    sendSSEMessage(clientIdUsed, {
+      type: "error",
+      message: "Unexpected error during processing",
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 }

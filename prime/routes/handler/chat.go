@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"os"
@@ -41,6 +40,22 @@ func ChatMessageHandler(c echo.Context) error {
 	}
 	prompt := chatReq.Prompt
 
+	responseManagerInterface := c.Get("responseManager")
+	if responseManagerInterface == nil {
+		log.Printf("Response manager not found in context")
+		return c.String(500, "Internal server error: Response manager not initialized")
+	}
+
+	responseManager, ok := responseManagerInterface.(interface {
+		SetChannel(string, chan string)
+		GetAndDelete(string) (chan string, bool)
+		CleanupChannel(string)
+	})
+	if !ok {
+		log.Printf("Failed to cast response manager")
+		return c.String(500, "Internal server error: Invalid response manager")
+	}
+
 	go func() {
 		file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
@@ -53,6 +68,10 @@ func ChatMessageHandler(c echo.Context) error {
 			log.Printf("Failed to write prompt to file for project %s: %v", projectId, err)
 		}
 	}()
+
+	responseCh := make(chan string, 1)
+	responseManager.SetChannel(projectId, responseCh)
+	defer responseManager.CleanupChannel(projectId)
 
 	msg := sharedTypes.ChatMessage{
 		Type:    sharedTypes.PROMPT,
@@ -68,33 +87,29 @@ func ChatMessageHandler(c echo.Context) error {
 		return c.String(500, "Failed to send message")
 	}
 
-	// Await SSE URL response
-	ctx := context.Background()
-	for {
-		msg, err := clients.KafkaReceiverClientFromOrchestrator.Reader.ReadMessage(ctx)
-		if err != nil {
-			log.Printf("Error reading message: %v", err)
-			return c.String(500, "Failed to read response")
-		}
-		responseId := string(msg.Key)
-		sseUrl := string(msg.Value)
+	ctx := c.Request().Context()
+	select {
+	case sseUrl := <-responseCh:
+		log.Printf("Received SSE URL for project %s: %s", projectId, sseUrl)
 
-		if responseId == projectId && sseUrl != "" {
-			go func() {
-				file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY, 0644)
-				if err != nil {
-					log.Printf("Failed to open file for SSE URL in project %s: %v", projectId, err)
-					return
-				}
+		go func() {
+			file, err := os.OpenFile("/tmp/"+projectId+".txt", os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Printf("Failed to open file for SSE URL in project %s: %v", projectId, err)
+				return
+			}
+			defer file.Close()
 
-				if _, err := file.WriteString("SSE_URL : \"" + sseUrl + "\"\n"); err != nil {
-					log.Printf("Failed to write SSE URL to file for project %s: %v", projectId, err)
-				}
+			if _, err := file.WriteString("SSE_URL : \"" + sseUrl + "\"\n"); err != nil {
+				log.Printf("Failed to write SSE URL to file for project %s: %v", projectId, err)
+			}
+		}()
 
-				defer file.Close()
-			}()
-			return c.JSON(200, map[string]string{"sseUrl": sseUrl})
-		}
+		return c.JSON(200, map[string]string{"sseUrl": sseUrl})
+
+	case <-ctx.Done():
+		log.Printf("Request cancelled for project %s", projectId)
+		return c.String(408, "Request timeout")
 	}
 }
 

@@ -11,7 +11,10 @@ const createFileInput = z.object({
 export const createFile = tool(
   async (input: z.infer<typeof createFileInput>) => {
     const { filePath, content } = createFileInput.parse(input);
-    const fullPath = path.resolve("/app/shared", filePath);
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const fullPath = path.resolve(projectDir, filePath);
 
     try {
       fs.mkdirSync(path.dirname(fullPath), { recursive: true });

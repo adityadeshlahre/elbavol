@@ -10,7 +10,10 @@ const listDirInput = z.object({
 export const listDir = tool(
   async (input: z.infer<typeof listDirInput>) => {
     const { directory } = listDirInput.parse(input);
-    const fullPath = path.resolve("/app/shared", directory);
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const fullPath = path.resolve(projectDir, directory);
 
     try {
       const items = fs.readdirSync(fullPath, { withFileTypes: true });
@@ -19,9 +22,16 @@ export const listDir = tool(
         isDirectory: item.isDirectory(),
         isFile: item.isFile(),
       }));
-      return result;
+      return {
+        message: `Found ${result.length} items in ${directory}`,
+        items: result,
+      };
     } catch (error) {
-      return { error: `Failed to list directory: ${(error as Error).message}` };
+      console.error(`Error listing directory ${fullPath}:`, error);
+      return {
+        error: `Failed to list directory: ${(error as Error).message}`,
+        items: [],
+      };
     }
   },
   {

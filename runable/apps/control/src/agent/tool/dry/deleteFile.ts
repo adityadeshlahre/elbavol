@@ -10,7 +10,10 @@ const deleteFileInput = z.object({
 export const deleteFile = tool(
   async (input: z.infer<typeof deleteFileInput>) => {
     const { filePath } = deleteFileInput.parse(input);
-    const fullPath = path.resolve("/app/shared", filePath);
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const fullPath = path.resolve(projectDir, filePath);
 
     try {
       if (!fs.existsSync(fullPath)) {

@@ -2,8 +2,9 @@ import { Annotation, END, START, StateGraph, MemorySaver } from "@langchain/lang
 import { sendSSEMessage } from "../../sse";
 import { analyzePrompt, promptAnalyzer } from "../tool/analysis/promptAnalyzer";
 import { buildSource, runAppNode } from "../tool/code/buildSource";
-import { enhancePrompt, enhancePromptNode } from "../tool/code/enhancePrompt";
-import { planChanges, plannerPromptTool } from "../tool/code/plannerPrompt";
+import { enhancePromptNode } from "../tool/code/enhancePrompt";
+import { planChanges } from "../tool/code/plannerPrompt";
+import { smartAnalyzeAndPlanNode } from "../tool/code/smartAnalyzer";
 import { validateBuild, validateBuildNode } from "../tool/code/validateBuild";
 import { getContext, getProjectContext } from "../tool/dry/getContext";
 import { saveContext, saveContextNode } from "../tool/dry/saveContext";
@@ -19,9 +20,10 @@ import { readFile } from "../tool/dry/readFile";
 import { updateFile } from "../tool/dry/updateFile";
 import { writeMultipleFile } from "../tool/dry/writeMultipleFile";
 import { checkUserGivenPrompt } from "../tool/code/userGivenPromptChecker";
+import { intelligentFixErrorsNode } from "../tool/code/intelligentErrorFixer";
 import { fixToolArgs } from "../index";
 
-const allTools = [
+export const allTools = [
   promptAnalyzer,
   buildSource,
   checkUserGivenPrompt,
@@ -51,6 +53,9 @@ export const GraphAnnotation = Annotation.Root({
   context: Annotation<any>(),
   toolResults: Annotation<any[]>(),
   buildStatus: Annotation<string>(),
+  buildErrors: Annotation<any[]>(),
+  errorAnalysis: Annotation<any>(),
+  progressTracking: Annotation<any>(),
   iterations: Annotation<number>({ reducer: (_a, b) => b, default: () => 0 }),
   completed: Annotation<boolean>({
     reducer: (_a, b) => b,
@@ -73,6 +78,8 @@ async function executeTools(state: GraphState): Promise<Partial<GraphState>> {
     type: "executing",
     message: "Executing tools...",
   });
+
+  process.env.PROJECT_ID = state.projectId; // remove this in prod
 
   const { model } = await import("../../agent/client");
   const { SYSTEM_PROMPTS } = await import("../../prompt");
@@ -98,7 +105,11 @@ async function executeTools(state: GraphState): Promise<Partial<GraphState>> {
         },
         {
           role: "user",
-          content: `Execute this plan: ${state.generatedPlan}\n\nContext: ${JSON.stringify(state.context)}\n\nIMPORTANT: You MUST use the available tools to execute this plan. Do NOT respond with text - use the tools to create files, read files, and perform all operations. Start by using listDir to check the current project structure.`,
+          content: `Execute this plan: ${state.generatedPlan}\n\nContext: ${JSON.stringify(state.context)}\n\nIMPORTANT: You MUST use the available tools to execute this plan. Do NOT respond with text - use the tools to create files, read files, and perform all operations.
+
+Project Status: ${state.context?.files?.length > 0 ? 'Existing project with files' : 'New/Empty project - you need to create the initial structure'}
+
+If this is a new project, START by creating the necessary files according to the plan. If it's an existing project, use listDir and readFile to understand the structure first.`,
         },
       ]);
       break;
@@ -240,68 +251,37 @@ async function executeTools(state: GraphState): Promise<Partial<GraphState>> {
     totalTools: toolResults.length,
   });
 
+  const filesCreated = toolResults
+    .filter(r => r?.toolCall?.name === "createFile" && !r.error)
+    .map(r => r?.toolCall?.args?.filePath);
+  const filesModified = toolResults
+    .filter(r => r?.toolCall?.name === "updateFile" && !r.error)
+    .map(r => r?.toolCall?.args?.filePath);
+
+  const currentProgress = state.progressTracking || {
+    filesCreated: [],
+    filesModified: [],
+    componentsBuilt: [],
+    lastSuccessfulIteration: 0,
+    noProgressCount: 0,
+    lastErrors: [],
+  };
+
+  const madeProgress = executedCount > 0 || filesCreated.length > 0 || filesModified.length > 0;
+
   return {
     toolResults,
     iterations: state.iterations + 1,
     accumulatedResponses: [executionSummary],
-  };
-}
-
-async function fixErrorsNode(state: GraphState): Promise<Partial<GraphState>> {
-  sendSSEMessage(state.clientId, {
-    type: "fixing",
-    message: "Fixing errors...",
-  });
-
-  const contextResult = await getContext.invoke({ projectId: state.projectId });
-  const updatedContext = contextResult.context;
-
-  const strategies = [
-    { toolName: "readFile", toolInput: { filePath: "package.json" } },
-    { toolName: "executeCommand", toolInput: { command: "bun install", cwd: state.projectId } },
-    { toolName: "testBuild", toolInput: { action: "build", cwd: state.projectId } },
-  ];
-
-  const toolMap = allTools.reduce(
-    (acc, tool) => {
-      acc[tool.name] = tool;
-      return acc;
+    progressTracking: {
+      filesCreated: [...currentProgress.filesCreated, ...filesCreated].filter(Boolean),
+      filesModified: [...currentProgress.filesModified, ...filesModified].filter(Boolean),
+      componentsBuilt: currentProgress.componentsBuilt,
+      lastSuccessfulIteration: madeProgress ? state.iterations + 1 : currentProgress.lastSuccessfulIteration,
+      noProgressCount: madeProgress ? 0 : currentProgress.noProgressCount + 1,
+      lastErrors: state.buildErrors || [],
     },
-    {} as Record<string, any>,
-  );
-
-  const results = [];
-  for (const strategy of strategies) {
-    try {
-      sendSSEMessage(state.clientId, {
-        type: "fixing",
-        message: `Trying strategy: ${strategy.toolName}`,
-      });
-
-      const tool = toolMap[strategy.toolName];
-      if (!tool) {
-        throw new Error(`Tool ${strategy.toolName} not found`);
-      }
-
-      const result = await tool.invoke(strategy.toolInput);
-      const success = result.success !== false;
-
-      results.push({ success, result, toolName: strategy.toolName });
-
-      if (success) {
-        sendSSEMessage(state.clientId, {
-          type: "fixing",
-          message: `Strategy ${strategy.toolName} succeeded`,
-        });
-        break;
-      }
-    } catch (error) {
-      console.warn(`Strategy ${strategy.toolName} failed:`, error);
-      results.push({ success: false, error: String(error), toolName: strategy.toolName });
-    }
-  }
-
-  return { context: updatedContext, toolResults: results };
+  };
 }
 
 function shouldEnhance(state: GraphState): string {
@@ -318,15 +298,60 @@ async function maxIterationsReached(state: GraphState): Promise<Partial<GraphSta
   };
 }
 
+function isStuck(state: GraphState): boolean {
+  if (!state.progressTracking) return false;
+
+  const progress = state.progressTracking;
+  const noProgress = progress.noProgressCount >= 3;
+  const sameErrors = state.buildErrors && state.buildErrors.length > 0 &&
+    state.iterations > 0 &&
+    JSON.stringify(state.buildErrors) === JSON.stringify(progress.lastErrors);
+
+  return noProgress || (sameErrors && state.iterations > progress.lastSuccessfulIteration + 3);
+}
+
 function shouldIterate(state: GraphState): string {
   if (state.completed) return END;
-  if (state.iterations >= 8) return "max_iterations";
+
+  if (state.iterations >= 15) {
+    sendSSEMessage(state.clientId, {
+      type: "max_iterations_reached",
+      message: `Maximum 15 iterations reached (current: ${state.iterations})`,
+    });
+    return "max_iterations";
+  }
+
+  if (isStuck(state)) {
+    sendSSEMessage(state.clientId, {
+      type: "stuck_detected",
+      message: "Agent appears stuck - no progress for multiple iterations",
+    });
+    return "max_iterations";
+  }
+
   if (state.buildStatus === "success") return "test_build";
+
+  if (state.buildStatus === "errors" && state.buildErrors && state.buildErrors.length > 0) {
+    const fixableCount = state.errorAnalysis?.fixableCount || 0;
+    
+    if (fixableCount > 0 && state.iterations < 10) {
+      return "fix_errors";
+    }
+    
+    if (state.iterations >= 10) {
+      sendSSEMessage(state.clientId, {
+        type: "too_many_errors",
+        message: "Unable to fix all errors after 10 iterations, completing with current state",
+      });
+      return "max_iterations";
+    }
+  }
+
   return "execute";
 }
 
 function shouldTest(state: GraphState): string {
-  return state.buildStatus === "tested" ? "push" : "fix_errors";
+  return state.buildStatus === "tested" ? "push" : "validate";
 }
 
 const checkpointer = new MemorySaver();
@@ -340,7 +365,7 @@ export function createMainGraph() {
     .addNode("execute", executeTools)
     .addNode("validate", validateBuildNode)
     .addNode("test_build", testBuildNode)
-    .addNode("fix_errors", fixErrorsNode)
+    .addNode("fix_errors", intelligentFixErrorsNode)
     .addNode("push", pushToR2Node)
     .addNode("save", saveContextNode)
     .addNode("run", runAppNode)
@@ -357,14 +382,51 @@ export function createMainGraph() {
     .addConditionalEdges("validate", shouldIterate, {
       test_build: "test_build",
       execute: "execute",
+      fix_errors: "fix_errors",
       max_iterations: "max_iterations",
       [END]: END,
     })
+    .addEdge("fix_errors", "validate")
     .addConditionalEdges("test_build", shouldTest, {
       push: "push",
-      fix_errors: "fix_errors",
+      validate: "validate",
     })
-    .addEdge("fix_errors", "test_build")
+    .addEdge("push", "save")
+    .addEdge("save", "run")
+    .addEdge("run", END)
+    .addEdge("max_iterations", END);
+
+  return workflow.compile({ checkpointer });
+}
+
+export function createOptimizedGraph() {
+  const workflow = new StateGraph(GraphAnnotation)
+    .addNode("smart_analyze_plan", smartAnalyzeAndPlanNode)
+    .addNode("get_context", getProjectContext)
+    .addNode("execute", executeTools)
+    .addNode("validate", validateBuildNode)
+    .addNode("test_build", testBuildNode)
+    .addNode("fix_errors", intelligentFixErrorsNode)
+    .addNode("push", pushToR2Node)
+    .addNode("save", saveContextNode)
+    .addNode("run", runAppNode)
+    .addNode("max_iterations", maxIterationsReached)
+    .addEdge(START, "smart_analyze_plan")
+    .addEdge("smart_analyze_plan", "get_context")
+    .addEdge("get_context", "execute")
+    .addEdge("execute", "validate")
+    .addConditionalEdges("validate", shouldIterate, {
+      test_build: "test_build",
+      execute: "execute",
+      fix_errors: "fix_errors",
+      max_iterations: "max_iterations",
+      [END]: END,
+    })
+    .addEdge("fix_errors", "validate")
+    .addConditionalEdges("test_build", shouldTest, {
+      push: "push",
+      validate: "validate",
+    })
     .addEdge("push", "save")
     .addEdge("save", "run")
     .addEdge("run", END)
@@ -374,3 +436,4 @@ export function createMainGraph() {
 }
 
 export const mainGraph = createMainGraph();
+export const optimizedGraph = createOptimizedGraph();

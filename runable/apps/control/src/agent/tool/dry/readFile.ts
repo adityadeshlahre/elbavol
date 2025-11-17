@@ -10,7 +10,10 @@ const readFileInput = z.object({
 export const readFile = tool(
   async (input: z.infer<typeof readFileInput>) => {
     const { filePath } = readFileInput.parse(input);
-    const fullPath = path.resolve("/app/shared", filePath);
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const fullPath = path.resolve(projectDir, filePath);
 
     try {
       const content = fs.readFileSync(fullPath, "utf8");

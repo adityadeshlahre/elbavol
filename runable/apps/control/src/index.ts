@@ -10,6 +10,7 @@ import {
   pushProjectInitializationToServingPod,
   waitForProjectInitializationConfirmation,
 } from "./classes/project";
+import { startSSEServer } from "./sse";
 
 console.log("Control POD started with env:", {
   NODE_ENV: process.env.NODE_ENV,
@@ -367,3 +368,5 @@ start().catch((error) => {
   console.error("Error starting Control POD:", error);
   process.exit(1);
 });
+
+startSSEServer();

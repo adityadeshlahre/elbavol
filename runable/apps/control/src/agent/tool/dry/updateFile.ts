@@ -11,7 +11,10 @@ const updateFileInput = z.object({
 export const updateFile = tool(
   async (input: z.infer<typeof updateFileInput>) => {
     const { filePath, content } = updateFileInput.parse(input);
-    const fullPath = path.resolve("/app/shared", filePath);
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const fullPath = path.resolve(projectDir, filePath);
 
     try {
       if (!fs.existsSync(fullPath)) {

@@ -1,6 +1,7 @@
 import type { GraphState } from "@/agent/graphs/main";
 import { sendSSEMessage } from "@/sse";
 import { tool } from "langchain";
+import path from "path";
 import * as z from "zod";
 
 const testBuildInput = z.object({
@@ -11,7 +12,10 @@ const testBuildInput = z.object({
 export const testBuild = tool(
   async (input: z.infer<typeof testBuildInput>) => {
     const { action, cwd } = testBuildInput.parse(input);
-    const workingDir = cwd ? `/app/shared/${cwd}` : "/app/shared";
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const workingDir = cwd ? path.join(projectDir, cwd) : projectDir;
     const command = action === "build" ? "bun run build" : "bun run test";
 
     try {

@@ -1,4 +1,4 @@
-export { createMainGraph, GraphAnnotation, mainGraph } from "./graphs/main";
+export { createMainGraph, createOptimizedGraph, GraphAnnotation, mainGraph, optimizedGraph } from "./graphs/main";
 export { processPrompt } from "./processPrompt";
 export function fixToolArgs(toolName: string, args: any): any | null {
     switch (toolName) {

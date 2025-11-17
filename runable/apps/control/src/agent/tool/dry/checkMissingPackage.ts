@@ -11,7 +11,10 @@ const checkMissingPackageInput = z.object({
 export const checkMissingPackage = tool(
   async (input: z.infer<typeof checkMissingPackageInput>) => {
     const { packages, cwd } = checkMissingPackageInput.parse(input);
-    const workingDir = cwd ? `/app/shared/${cwd}` : "/app/shared";
+    const projectId = process.env.PROJECT_ID || "";
+    const sharedDir = process.env.SHARED_DIR || "/app/shared";
+    const projectDir = path.join(sharedDir, projectId);
+    const workingDir = cwd ? path.join(projectDir, cwd) : projectDir;
     const packageJsonPath = path.join(workingDir, "package.json");
 
     try {
