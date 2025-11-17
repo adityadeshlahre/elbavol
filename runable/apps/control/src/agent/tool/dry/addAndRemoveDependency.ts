@@ -1,6 +1,7 @@
 import { tool } from "langchain";
 import path from "path";
 import * as z from "zod";
+import { spawn } from "node:child_process";
 
 const dependencyInput = z.object({
   packages: z.array(z.string()),
@@ -17,16 +18,20 @@ export const addDependency = tool(
     const command = `bun add ${packages.join(" ")}`;
 
     try {
-      const proc = Bun.spawn(["sh", "-c", command], {
-        cwd: workingDir,
-        stdout: "pipe",
-        stderr: "pipe",
+      const proc = spawn("sh", ["-c", command], { cwd: workingDir });
+
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+
+      proc.stdout.on("data", (d) => stdoutChunks.push(d));
+      proc.stderr.on("data", (d) => stderrChunks.push(d));
+
+      const exitCode: number = await new Promise((resolve) => {
+        proc.on("close", resolve);
       });
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const exitCode = await proc.exited;
+
+      const stdout = Buffer.concat(stdoutChunks).toString();
+      const stderr = Buffer.concat(stderrChunks).toString();
 
       return { exitCode, stdout, stderr, success: exitCode === 0 };
     } catch (error) {
@@ -53,16 +58,20 @@ export const removeDependency = tool(
     const command = `bun remove ${packages.join(" ")}`;
 
     try {
-      const proc = Bun.spawn(["sh", "-c", command], {
-        cwd: workingDir,
-        stdout: "pipe",
-        stderr: "pipe",
+      const proc = spawn("sh", ["-c", command], { cwd: workingDir });
+
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+
+      proc.stdout.on("data", (d) => stdoutChunks.push(d));
+      proc.stderr.on("data", (d) => stderrChunks.push(d));
+
+      const exitCode: number = await new Promise((resolve) => {
+        proc.on("close", resolve);
       });
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const exitCode = await proc.exited;
+
+      const stdout = Buffer.concat(stdoutChunks).toString();
+      const stderr = Buffer.concat(stderrChunks).toString();
 
       return { exitCode, stdout, stderr, success: exitCode === 0 };
     } catch (error) {

@@ -2,6 +2,7 @@ import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import fs from "fs";
 import type { Producer } from "kafkajs";
 import path from "path";
+import { spawn } from "node:child_process";
 
 export const serveTheProject = async (
   projectId: string,
@@ -64,34 +65,26 @@ export const serveTheProject = async (
   const port = 3000;
 
   try {
-    const killProc = Bun.spawn(
-      ["sh", "-c", `lsof -ti:${port} | xargs kill -9 2>/dev/null || true`],
-      {
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
-    await killProc.exited;
+    const killProc = spawn("sh", ["-c", `lsof -ti:${port} | xargs kill -9 2>/dev/null || true`]);
+
+    await new Promise((resolve) => killProc.on("close", resolve));
   } catch (error) {
     console.error(`Failed to free port ${port}:`, error);
   }
 
-  const proc = Bun.spawn(["sh", "-c", `cd "${dir}" && ${startScript}`], {
-    stdout: "pipe",
-    stderr: "pipe",
+  const proc = spawn("sh", ["-c", `cd "${dir}" && ${startScript}`], {
+    cwd: dir,
   });
 
   console.log(`Starting server for project ${projectId} on port ${port}`);
 
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  const checkProc = Bun.spawn(["nc", "-z", "localhost", port.toString()], {
-    // TODO: i think this needs to be changed to something else on production
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  const checkProc = spawn("nc", ["-z", "localhost", port.toString()]);
 
-  const checkCode = await checkProc.exited;
+  const checkCode: number = await new Promise((resolve) => {
+    checkProc.on("close", resolve);
+  });
 
   if (checkCode === 0) {
     await producer.send({
@@ -121,7 +114,7 @@ export const serveTheProject = async (
     });
   }
 
-  proc.exited.then(async (code) => {
+  proc.on("close", async (code) => {
     if (code !== 0) {
       await producer.send({
         topic: TOPIC.SERVING_TO_ORCHESTRATOR,

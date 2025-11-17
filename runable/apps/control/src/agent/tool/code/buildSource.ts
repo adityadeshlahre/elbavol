@@ -7,6 +7,7 @@ import * as z from "zod";
 import { producer } from "../../../index";
 import { sendSSEMessage } from "@/sse";
 import type { GraphState } from "@/agent/graphs/main";
+import { spawn } from "node:child_process";
 
 export const buildProjectAndNotifyToRun = async (
   projectId: string,
@@ -49,15 +50,19 @@ export const buildProjectAndNotifyToRun = async (
   }
 
   try {
-    const installProc = Bun.spawn(["bun", "install"], {
-      cwd: dir,
-      stdout: "pipe",
-      stderr: "pipe",
+    const installProc = spawn("bun", ["install"], { cwd: dir });
+
+    let installStderr = "";
+    installProc.stderr.on("data", (chunk) => {
+      installStderr += chunk.toString();
     });
 
-    const installCode = await installProc.exited;
+    const installCode = await new Promise((resolve) => {
+      installProc.on("close", (code) => resolve(code));
+      installProc.on("error", () => resolve(1));
+    });
+
     if (installCode !== 0) {
-      const error = await new Response(installProc.stderr).text();
       await producer.send({
         topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
         messages: [
@@ -65,7 +70,7 @@ export const buildProjectAndNotifyToRun = async (
             value: JSON.stringify({
               key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
               projectId,
-              error: `Failed to install dependencies: ${error}`,
+              error: `Failed to install dependencies: ${installStderr}`,
             }),
           },
         ],
@@ -73,15 +78,18 @@ export const buildProjectAndNotifyToRun = async (
       return false;
     }
 
-    const buildProc = Bun.spawn(["bun", "run", "build"], {
-      cwd: dir,
-      stdout: "pipe",
-      stderr: "pipe",
+    const buildProc = spawn("bun", ["run", "build"], { cwd: dir });
+    let buildStderr = "";
+    buildProc.stderr.on("data", (chunk) => {
+      buildStderr += chunk.toString();
     });
 
-    const buildCode = await buildProc.exited;
+    const buildCode = await new Promise((resolve) => {
+      buildProc.on("close", (code) => resolve(code));
+      buildProc.on("error", () => resolve(1));
+    });
+
     if (buildCode !== 0) {
-      const error = await new Response(buildProc.stderr).text();
       await producer.send({
         topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
         messages: [
@@ -89,7 +97,7 @@ export const buildProjectAndNotifyToRun = async (
             value: JSON.stringify({
               key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
               projectId,
-              error: `Failed to build project: ${error}`,
+              error: `Failed to build project: ${buildStderr}`,
             }),
           },
         ],
