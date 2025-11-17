@@ -56,12 +56,42 @@ export async function testBuildNode(state: GraphState): Promise<Partial<GraphSta
     type: "testing",
     message: "Testing build...",
   });
-  const result = await testBuild.invoke({
-    action: "build",
-    cwd: state.projectId,
-  });
-  return {
-    buildStatus: result.success ? "tested" : "errors",
-    error: result.stderr || result.error,
-  };
+
+  try {
+    const result = await testBuild.invoke({
+      action: "build",
+    });
+
+    if (result.success) {
+      sendSSEMessage(state.clientId, {
+        type: "test_success",
+        message: "Build test passed successfully",
+      });
+      return {
+        buildStatus: "tested",
+        error: undefined,
+      };
+    } else {
+      sendSSEMessage(state.clientId, {
+        type: "test_failed",
+        message: "Build test failed",
+        error: result.stderr || result.error,
+      });
+      return {
+        buildStatus: "errors",
+        error: result.stderr || result.error,
+      };
+    }
+  } catch (error) {
+    console.error("Error in testBuildNode:", error);
+    sendSSEMessage(state.clientId, {
+      type: "test_error",
+      message: "Test execution failed",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      buildStatus: "errors",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }

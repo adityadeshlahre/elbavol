@@ -4,7 +4,7 @@ import { getObject, listObjects } from "@elbavol/r2";
 import fs from "fs";
 import { Kafka } from "kafkajs";
 import path from "path";
-import { processPrompt } from "./agent/processPrompt";
+import { processPrompt } from "./agent/process/prompt";
 import { buildProjectAndNotifyToRun } from "./agent/tool/code/buildSource";
 import {
   pushProjectInitializationToServingPod,

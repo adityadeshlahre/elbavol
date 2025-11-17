@@ -201,7 +201,7 @@ func main() {
 						chatMsg.Payload,
 						KafkaSenderClientToControl,
 						KafkaReceiverClientFromControl,
-						KafkaSenderClientToControl,
+						KafkaSenderClientToBackend,
 					)
 				} else {
 					log.Printf("Unknown JSON request type: %s for project %s", chatMsg.Type, projectId)

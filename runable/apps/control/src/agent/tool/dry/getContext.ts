@@ -16,6 +16,32 @@ export const getContext = tool(
     const projectDir = path.join(sharedDir, projectId);
 
     const context: Record<string, any> = {
+      projectId,
+      projectPath: projectDir,
+      baseTemplate: {
+        exists: false,
+        description: "React 19 + TypeScript + Bun + Tailwind CSS v4 + shadcn/ui base template",
+        features: [
+          "React 19 with TypeScript",
+          "Bun runtime and package manager",
+          "Tailwind CSS v4 (latest)",
+          "shadcn/ui components (Button, Card, Input, Label, Select, Textarea)",
+          "Lucide React icons",
+          "Hot reload enabled",
+          "Pre-configured build system"
+        ],
+        availableComponents: [
+          "@/components/ui/button - Button component",
+          "@/components/ui/card - Card component",
+          "@/components/ui/input - Input component",
+          "@/components/ui/label - Label component",
+          "@/components/ui/select - Select component",
+          "@/components/ui/textarea - Textarea component"
+        ],
+        utilities: [
+          "@/lib/utils - cn() function for class merging"
+        ]
+      },
       fileStructure: {},
       dependencies: [],
       currentFiles: {},
@@ -28,16 +54,45 @@ export const getContext = tool(
 
     try {
       if (fs.existsSync(projectDir)) {
+        context.baseTemplate.exists = true;
+        
         const files = fs.readdirSync(projectDir, { recursive: true });
         context.metadata.totalFiles = files.length;
 
-        // Read key files
-        const keyFiles = ["package.json", "src/index.ts", "src/App.tsx"];
+        const fileList = files
+          .filter((file: any) => !file.includes('node_modules') && !file.includes('.turbo'))
+          .map((file: any) => typeof file === 'string' ? file : file.toString());
+        
+        context.fileStructure = {
+          root: projectDir,
+          files: fileList.slice(0, 50),
+          hasMore: fileList.length > 50
+        };
+
+        const keyFiles = [
+          "package.json", 
+          "src/App.tsx", 
+          "src/index.tsx",
+          "src/index.ts",
+          "src/index.css",
+          "src/lib/utils.ts",
+          "components.json"
+        ];
+        
         for (const file of keyFiles) {
           const filePath = path.join(projectDir, file);
           if (fs.existsSync(filePath)) {
-            context.currentFiles[file] = fs.readFileSync(filePath, "utf8");
+            const content = fs.readFileSync(filePath, "utf8");
+            context.currentFiles[file] = content;
           }
+        }
+
+        const componentsUiDir = path.join(projectDir, "src/components/ui");
+        if (fs.existsSync(componentsUiDir)) {
+          const uiComponents = fs.readdirSync(componentsUiDir)
+            .filter(file => file.endsWith('.tsx'))
+            .map(file => file.replace('.tsx', ''));
+          context.baseTemplate.installedComponents = uiComponents;
         }
 
         // Get dependencies from package.json
@@ -45,7 +100,12 @@ export const getContext = tool(
         if (fs.existsSync(packagePath)) {
           const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
           context.dependencies = Object.keys(packageJson.dependencies || {});
+          context.devDependencies = Object.keys(packageJson.devDependencies || {});
+          context.scripts = packageJson.scripts || {};
         }
+      } else {
+        context.error = "Project directory does not exist at " + projectDir;
+        context.metadata.buildStatus = "missing";
       }
     } catch (error) {
       context.error = `Error getting context: ${(error as Error).message}`;

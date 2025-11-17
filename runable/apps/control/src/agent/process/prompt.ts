@@ -1,8 +1,8 @@
 import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import { randomUUID } from "crypto";
 import type { Producer } from "kafkajs";
-import { sendSSEMessage, getSSEUrl } from "../sse";
-import { mainGraph } from "./graphs/main";
+import { sendSSEMessage, getSSEUrl } from "../../sse";
+import { executeMainFlow } from "../flow/executor";
 
 export async function processPrompt(
   projectId: string,
@@ -33,22 +33,21 @@ export async function processPrompt(
 
     let finalState;
     try {
-      finalState = await mainGraph.invoke({
+      finalState = await executeMainFlow({
         projectId,
         prompt: prompt,
-        iterations: 0,
         clientId: clientIdUsed,
         accumulatedResponses: [],
-      }, {
-        configurable: { thread_id: projectId },
-        recursionLimit: 1000,
+        completed: false,
+        messages: [],
+        threadId: projectId,
       });
-    } catch (graphError) {
-      console.error(`Graph execution error for project ${projectId}:`, graphError);
+    } catch (flowError) {
+      console.error(`Flow execution error for project ${projectId}:`, flowError);
       sendSSEMessage(clientIdUsed, {
         type: "error",
-        message: "Graph execution failed",
-        error: graphError instanceof Error ? graphError.message : String(graphError),
+        message: "Flow execution failed",
+        error: flowError instanceof Error ? flowError.message : String(flowError),
       });
       return;
     }

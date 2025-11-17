@@ -1,5 +1,8 @@
-export { createMainGraph, createOptimizedGraph, GraphAnnotation, mainGraph, optimizedGraph } from "./graphs/main";
-export { processPrompt } from "./processPrompt";
+export { allTools, type GraphState } from "./graphs/main";
+export { executeMainFlow, invokeAgentWithMemory } from "./flow/executor";
+export { processPrompt } from "./process/prompt";
+export { agent, checkpointer } from "./client";
+
 export function fixToolArgs(toolName: string, args: any): any | null {
     switch (toolName) {
         case 'createFile':

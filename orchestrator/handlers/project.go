@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -103,6 +104,8 @@ func ReceivePromptAndSendLLMResponseAndSendToProjectNodeAndToBackendAgainPubSubH
 	} else {
 		sseUrl = payload // fallback
 	}
+
+	fmt.Println(sseUrl) // fix this in prod
 
 	err = senderToBackend.WriteMessage(
 		[]byte(projectId),
