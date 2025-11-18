@@ -11,6 +11,7 @@ interface SSEClient {
 
 let sseServer: http.Server | null = null;
 const clients = new Map<string, SSEClient>();
+const projectSSEUrls = new Map<string, string>();
 
 export function startSSEServer(): string {
   if (sseServer) {
@@ -97,6 +98,15 @@ export function closeSSEConnection(clientId: string): void {
 
 export function getSSEUrl(clientId: string): string {
   return `http://localhost:${SSE_PORT}/sse?id=${clientId}`;
+}
+
+export function getProjectSSEUrl(projectId: string): string {
+  if (projectSSEUrls.has(projectId)) {
+    return projectSSEUrls.get(projectId)!;
+  }
+  const url = getSSEUrl(projectId);
+  projectSSEUrls.set(projectId, url);
+  return url;
 }
 
 process.on("SIGINT", () => {

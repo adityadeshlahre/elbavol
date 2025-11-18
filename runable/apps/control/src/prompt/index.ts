@@ -65,12 +65,12 @@ ENVIRONMENT AWARENESS:
 - The project uses TSX files (.tsx) for React components - ALWAYS use .tsx extension
 - ALWAYS use .ts extension for TypeScript files
 - DO NOT create JavaScript files (.jsx, .js) - use TypeScript
-- Use the existing shadcn/ui components from \`@/components/ui/\`
-- EXISTING UI COMPONENTS AVAILABLE: Button, Card, Input, Label, Select, Textarea
-- Use the \`cn\` utility from \`@/lib/utils\` for class merging
-- Use Lucide React icons for all icons
-- Follow the existing component patterns and styling
-- To add new shadcn/ui components: First check if the component exists online at https://ui.shadcn.com/docs/components, then use \`bunx shadcn@latest add <component-name>\` if needed
+ - PREFER EXISTING shadcn/ui components from \`@/components/ui/\`: Button, Card, Input, Label, Select, Textarea
+ - Use existing components when possible, but create custom components if needed for specific functionality
+ - Use the \`cn\` utility from \`@/lib/utils\` for class merging
+ - Use Lucide React icons for all icons
+ - Follow the existing component patterns and styling
+ - Add new shadcn/ui components from https://ui.shadcn.com/docs/components if they fit better than custom ones
 
 FILE HANDLING RULES:
 - ALWAYS read a file before modifying it
@@ -98,9 +98,9 @@ COMPONENT CREATION:
 - Ensure components are properly imported where needed
 - Follow React best practices (hooks, functional components)
 - Implement proper TypeScript types for props
-- PRIORITIZE EXISTING UI COMPONENTS: Always use Button, Card, Input, Label, Select, Textarea from @/components/ui/ before creating custom ones
-- For new shadcn/ui components: Check https://ui.shadcn.com/docs/components first, then add with \`bunx shadcn@latest add <component-name>\`
-- Leverage class-variance-authority for component variants using the existing patterns
+ - Prefer existing UI components: Button, Card, Input, Label, Select, Textarea from @/components/ui/
+ - Create custom components when existing ones don't meet the requirements
+ - Leverage class-variance-authority for component variants using the existing patterns
 
 IMPORTANT NOTES:
 - DO NOT reinstall packages that are already in package.json
@@ -177,12 +177,12 @@ A brief, one-sentence description of the application to be built.
 Describe what's already set up in the environment:
 - React 19 with TypeScript is installed and configured
 - Tailwind CSS v4 is installed and configured with custom utilities
-- EXISTING shadcn/ui components available: Button, Card, Input, Label, Select, Textarea in src/components/ui/
-- Lucide React icons are available for all icon needs
-- The cn utility function is available for class merging
-- Development server is already running with hot reload
-- Changes are automatically reflected in the browser
-- To add more shadcn/ui components: Check https://ui.shadcn.com/docs/components and use \`bunx shadcn@latest add <component-name>\`
+ - EXISTING shadcn/ui components available: Button, Card, Input, Label, Select, Textarea in src/components/ui/
+ - Lucide React icons are available for all icon needs
+ - The cn utility function is available for class merging
+ - Development server is already running with hot reload
+ - Changes are automatically reflected in the browser
+ - Prefer existing components, but add new shadcn/ui components or create custom ones as needed
 
 ### Feature Plan
 A detailed list of all features that need to be created or modified. For each feature:
@@ -370,10 +370,10 @@ You have access to specialized tools for:
 - Use functional components with hooks and TypeScript
 - Follow React best practices with modern patterns
 - Implement proper prop validation with TypeScript interfaces
-- PRIORITIZE EXISTING shadcn/ui components: Button, Card, Input, Label, Select, Textarea from @/components/ui/
-- For new components, check https://ui.shadcn.com/docs/components and add with \`bunx shadcn@latest add <component-name>\`
-- Leverage the cn utility for class merging
-- Ensure proper import/export syntax with @/ aliases
+ - Prefer existing shadcn/ui components: Button, Card, Input, Label, Select, Textarea from @/components/ui/
+ - Create custom components when existing ones are insufficient
+ - Leverage the cn utility for class merging
+ - Ensure proper import/export syntax with @/ aliases
 
 ### File Organization
 - Place components in \`src/components/\` for custom, \`src/components/ui/\` for reusable

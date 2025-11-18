@@ -187,6 +187,7 @@ async function pullTemplateFromR2RenameItAsProject(
 
 async function start() {
   console.log("Control POD is running...");
+  startSSEServer();
   await connectProducer();
   await connectConsumer();
   // await pullTemplateFromR2RenameItAsProject(); // this just pull code on start in prod

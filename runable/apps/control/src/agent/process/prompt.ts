@@ -1,20 +1,23 @@
 import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import { randomUUID } from "crypto";
 import type { Producer } from "kafkajs";
-import { sendSSEMessage, getSSEUrl } from "../../sse";
+import { sendSSEMessage, getProjectSSEUrl } from "../../sse";
 import { executeMainFlow } from "../flow/executor";
+import { getProjectMemories, saveConversationMemory } from "../../memory";
 
 export async function processPrompt(
   projectId: string,
   prompt: string,
   producer: Producer,
-  clientId?: string,
 ): Promise<void> {
   console.log(`Starting agent processing for project ${projectId}: ${prompt}`);
 
-  const clientIdUsed = clientId || randomUUID();
+  const clientIdUsed = projectId;
 
   try {
+    const memories = await getProjectMemories(projectId);
+    const contextInfo = memories.length > 0 ? `Previous context: ${JSON.stringify(memories.slice(-5))}` : "";
+
     sendSSEMessage(clientIdUsed, {
       type: "started",
       message: "Processing prompt...",
@@ -25,17 +28,17 @@ export async function processPrompt(
       messages: [
         {
           key: projectId,
-          value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + getSSEUrl(clientIdUsed),
+          value: MESSAGE_KEYS.PROMPT_RESPONSE + "|" + getProjectSSEUrl(clientIdUsed),
         },
       ],
     });
-    console.log(`Sent SSE URL to orchestrator for project ${projectId}: ${getSSEUrl(clientIdUsed)}`);
+    console.log(`Sent SSE URL to orchestrator for project ${projectId}: ${getProjectSSEUrl(clientIdUsed)}`);
 
     let finalState;
     try {
       finalState = await executeMainFlow({
         projectId,
-        prompt: prompt,
+        prompt: prompt + (contextInfo ? `\n\n${contextInfo}` : ""),
         clientId: clientIdUsed,
         accumulatedResponses: [],
         completed: false,
@@ -62,6 +65,9 @@ export async function processPrompt(
       const aiResponse =
         finalState.accumulatedResponses?.join("\n\n") ||
         "No AI responses generated";
+
+      await saveConversationMemory(projectId, prompt, aiResponse);
+
       await producer.send({
         topic: TOPIC.ORCHESTRATOR_TO_PRIME,
         messages: [{ key: projectId, value: `AI_RESPONSE: ${aiResponse}` }],

@@ -14,7 +14,7 @@ export const smartAnalyzeAndPlan = tool(
     async (input: z.infer<typeof smartAnalyzerInput>) => {
         const { prompt, context } = smartAnalyzerInput.parse(input);
 
-        const systemPrompt = `You are an expert AI assistant that analyzes user prompts and creates detailed execution plans for modifying existing React applications.
+        const systemPrompt = `You are an expert AI assistant that analyzes user prompts and creates detailed execution plans for modifying existing React applications. Focus on creating BEAUTIFUL, modern UIs with proper planning.
 
 CRITICAL CONTEXT - READ THIS FIRST:
 - A BASE TEMPLATE ALREADY EXISTS at SHARED_DIR/projectId
@@ -30,6 +30,7 @@ BASE TEMPLATE INCLUDES:
 ✅ Tailwind CSS v4 (latest) - ALREADY INSTALLED AND CONFIGURED
 ✅ shadcn/ui components - Button, Card, Input, Label, Select, Textarea - ALREADY AVAILABLE
 ✅ Lucide React icons - ALREADY INSTALLED
+✅ For new shadcn components: Use \`bunx --bun shadcn@latest add <component-name>\` from https://ui.shadcn.com/docs/components
 ✅ Hot reload with bun --hot - ALREADY RUNNING
 ✅ Build system with build.ts - ALREADY CONFIGURED
 ✅ Utility functions: cn() in @/lib/utils - ALREADY AVAILABLE
@@ -49,6 +50,7 @@ YOUR WORKFLOW - FOLLOW THIS STRICTLY:
 1. FIRST: Read existing files to understand current structure
    - ALWAYS start with: listDir, readFile for package.json, readFile for App.tsx
 2. ANALYZE: Understand what's already there and what needs to change
+3. PLAN BEAUTIFUL UI: Include gradients, shadows, animations, hover effects, and modern design in all components
 3. PLAN: Create modifications based on existing structure
 4. MODIFY: Use updateFile for existing files, createFile ONLY for new files
 5. DO NOT: Create new project, reinstall existing packages, or ignore existing structure
@@ -113,6 +115,13 @@ MANDATORY FIRST STEPS IN EVERY PLAN:
 3. readFile({ filePath: "src/App.tsx" }) - Understand current app
 
 Then modify/add files based on what you found.
+
+BEAUTIFUL UI DESIGN REQUIREMENTS:
+- Use Tailwind CSS for stunning visuals: gradients (bg-gradient-to-r from-blue-500 to-purple-600), shadows (shadow-2xl), animations (animate-pulse), hover effects (hover:scale-105)
+- Prefer existing shadcn/ui components (Button, Card, Input, Label, Select, Textarea) over custom ones
+- Add Lucide icons for better UX
+- Create responsive, modern designs with proper spacing and colors
+- For new components: \`bunx --bun shadcn@latest add <component-name>\` if needed from https://ui.shadcn.com/docs/components
 
 CRITICAL: Return ONLY valid JSON. Do NOT wrap in markdown code blocks or backticks. Just the raw JSON object.`;
 
