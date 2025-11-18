@@ -475,6 +475,11 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
                 state = { ...state, ...testResult };
 
                 if (state.buildStatus === "tested") {
+                    sendSSEMessage(state.clientId, {
+                        type: "build_success",
+                        message: "Build test passed, proceeding to deployment",
+                    });
+
                     const pushResult = await pushNode(state);
                     state = { ...state, ...pushResult };
 
@@ -484,10 +489,9 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
                     const runResult = await runNode(state);
                     state = { ...state, ...runResult };
                     break;
-                } else {
-                    const fixResult = await fixErrorsNode(state);
-                    state = { ...state, ...fixResult };
                 }
+                const fixResult = await fixErrorsNode(state);
+                state = { ...state, ...fixResult };
             } else if (state.buildStatus === "errors" && state.buildErrors && state.buildErrors.length > 0) {
                 const fixResult = await fixErrorsNode(state);
                 state = { ...state, ...fixResult };

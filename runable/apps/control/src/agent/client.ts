@@ -9,7 +9,7 @@ class LLMClient {
   private constructor() {
     this._model = new ChatGoogleGenerativeAI({
       apiKey: process.env.GOOGLE_API_KEY || "",
-      model: "gemini-2.0-flash-lite",
+      model: "gemini-2.0-flash",
       temperature: 0,
     });
     this._checkpointer = new MemorySaver();

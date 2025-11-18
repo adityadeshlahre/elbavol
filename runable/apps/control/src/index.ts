@@ -33,6 +33,8 @@ export const processing = new Map<
   (value: { success: boolean; payload?: string }) => void
 >();
 
+const promptProcessing = new Set<string>();
+
 const kafkaConfig = {
   clientId: `control-pod-${Date.now()}`,
   brokers: (process.env.KAFKA_BROKERS || "localhost:9092").split(","),
@@ -44,10 +46,14 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({
   groupId: GROUP_ID.CONTROL_POD,
+  sessionTimeout: 300000,
+  heartbeatInterval: 10000,
 });
 
 export const consumerControlFromServe = kafka.consumer({
   groupId: GROUP_ID.CONTROL_TO_SERVING,
+  sessionTimeout: 300000,
+  heartbeatInterval: 10000,
 });
 
 async function connectProducer() {
@@ -200,6 +206,7 @@ async function start() {
 
   await consumer.run({
     partitionsConsumedConcurrently: 1,
+    autoCommit: false,
     eachMessage: async ({ message, partition, topic }) => {
       console.log(
         `Received message from topic: ${topic}, partition: ${partition}`,
@@ -298,7 +305,18 @@ async function start() {
             console.log(
               `Processing prompt for project ${projectId}: ${prompt}`,
             );
-            await processPrompt(projectId, prompt, producer);
+            if (promptProcessing.has(projectId)) {
+              console.log(
+                `Project ${projectId} is already processing a prompt, skipping`,
+              );
+              break;
+            }
+            promptProcessing.add(projectId);
+            try {
+              await processPrompt(projectId, prompt, producer);
+            } finally {
+              promptProcessing.delete(projectId);
+            }
             console.log("Agent processing started for project:", projectId);
           } else {
             console.log(
@@ -307,6 +325,8 @@ async function start() {
           }
           break;
       }
+
+      await consumer.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
     },
   });
 
@@ -316,7 +336,8 @@ async function start() {
   });
 
   await consumerControlFromServe.run({
-    eachMessage: async ({ message }) => {
+    autoCommit: false,
+    eachMessage: async ({ message, partition, topic }) => {
       const projectId = message.key?.toString();
       const value = message.value?.toString();
       if (!value) return;
@@ -346,6 +367,8 @@ async function start() {
           );
           break;
       }
+
+      await consumerControlFromServe.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
     },
   });
 
