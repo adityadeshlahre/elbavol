@@ -2,7 +2,7 @@ import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
 import { SYSTEM_PROMPTS } from "@/prompt";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/main";
 import { sendSSEMessage } from "@/sse";
 
 export const enhancePromptInput = z.object({
@@ -49,8 +49,8 @@ export const enhancePrompt = tool(
 );
 
 export async function enhancePromptNode(
-  state: GraphState,
-): Promise<Partial<GraphState>> {
+  state: WorkflowState,
+): Promise<Partial<WorkflowState>> {
   let enhanced = state.prompt;
   if (state.analysis?.needsEnhancement) {
     sendSSEMessage(state.clientId, {
@@ -67,7 +67,6 @@ export async function enhancePromptNode(
     if (result.success && result.enhancedPrompt) {
       return {
         enhancedPrompt: enhanced,
-        accumulatedResponses: [`Enhanced Prompt: ${result.enhancedPrompt}`],
       };
     }
   }

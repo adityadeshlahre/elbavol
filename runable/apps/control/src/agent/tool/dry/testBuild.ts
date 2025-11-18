@@ -1,4 +1,4 @@
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 import { sendSSEMessage } from "@/sse";
 import { spawn } from "node:child_process";
 import { tool } from "langchain";
@@ -69,7 +69,7 @@ export const testBuild = tool(
 );
 
 
-export async function testBuildNode(state: GraphState): Promise<Partial<GraphState>> {
+export async function testBuildNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "testing",
     message: "Testing build...",

@@ -1,8 +1,7 @@
 import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
-import { randomUUID } from "crypto";
 import type { Producer } from "kafkajs";
 import { sendSSEMessage, getProjectSSEUrl } from "../../sse";
-import { executeMainFlow } from "../flow/executor";
+import { executeMainFlow } from "../graphs/main";
 import { getProjectMemories, saveConversationMemory } from "../../memory";
 
 export async function processPrompt(
@@ -40,7 +39,7 @@ export async function processPrompt(
         projectId,
         prompt: prompt + (contextInfo ? `\n\n${contextInfo}` : ""),
         clientId: clientIdUsed,
-        accumulatedResponses: [],
+        fixAttempts: 0,
         completed: false,
         messages: [],
         threadId: projectId,
@@ -62,9 +61,7 @@ export async function processPrompt(
         result: finalState,
       });
 
-      const aiResponse =
-        finalState.accumulatedResponses?.join("\n\n") ||
-        "No AI responses generated";
+      const aiResponse = `Workflow completed: ${finalState.buildStatus}`;
 
       await saveConversationMemory(projectId, prompt, aiResponse);
 

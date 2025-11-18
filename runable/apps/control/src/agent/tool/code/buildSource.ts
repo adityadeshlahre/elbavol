@@ -6,7 +6,7 @@ import path from "path";
 import * as z from "zod";
 import { producer } from "../../../index";
 import { sendSSEMessage } from "@/sse";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 import { spawn } from "node:child_process";
 
 export const buildProjectAndNotifyToRun = async (
@@ -173,7 +173,7 @@ export const buildSource = tool(
 );
 
 
-export async function runAppNode(state: GraphState): Promise<Partial<GraphState>> {
+export async function runAppNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "running",
     message: "Running application...",

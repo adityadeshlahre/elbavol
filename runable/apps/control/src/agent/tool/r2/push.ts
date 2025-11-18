@@ -6,7 +6,7 @@ import path from "path";
 import * as z from "zod";
 import { producer } from "../../../index";
 import { sendSSEMessage } from "@/sse";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 
 const pushCodeInput = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -142,14 +142,14 @@ function getContentType(filePath: string): string {
 }
 
 
-export async function pushToR2Node(state: GraphState): Promise<Partial<GraphState>> {
+export async function pushToR2Node(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "pushing",
     message: "Pushing to storage...",
   });
-  const result = await pushFilesToR2.invoke({
+  await pushFilesToR2.invoke({
     projectId: state.projectId,
     bucketName: "elbavol",
   });
-  return { pushResult: result };
+  return {};
 }

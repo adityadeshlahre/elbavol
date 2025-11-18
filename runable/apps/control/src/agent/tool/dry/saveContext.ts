@@ -1,4 +1,4 @@
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 import { sendSSEMessage } from "@/sse";
 import fs from "fs";
 import { tool } from "langchain";
@@ -34,8 +34,8 @@ export const saveContext = tool(
 );
 
 export async function saveContextNode(
-  state: GraphState,
-): Promise<Partial<GraphState>> {
+  state: WorkflowState,
+): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "saving",
     message: "Saving context...",

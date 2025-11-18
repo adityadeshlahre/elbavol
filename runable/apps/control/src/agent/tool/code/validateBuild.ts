@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { tool } from "langchain";
 import * as z from "zod";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 import { sendSSEMessage } from "@/sse";
 
 const validateBuildInput = z.object({
@@ -24,6 +24,18 @@ function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildErr
   const combinedOutput = stderr + "\n" + stdout;
   const lines = combinedOutput.split("\n");
 
+  const viteErrorPattern = /failed to resolve import ["']([^"']+)["'] from ["']([^"']+)["']/i;
+  const viteMatch = combinedOutput.match(viteErrorPattern);
+  if (viteMatch) {
+    errors.push({
+      type: "dependency",
+      severity: "critical",
+      message: `Failed to resolve import "${viteMatch[1]}" from "${viteMatch[2]}"`,
+      file: viteMatch[2],
+      fixable: true,
+    });
+  }
+
   for (const line of lines) {
     if (line.includes("error") || line.includes("Error") || line.includes("ERROR")) {
       const error: BuildError = {
@@ -33,8 +45,9 @@ function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildErr
         fixable: true,
       };
 
-      if (line.includes("Cannot find module") || line.includes("Module not found") || line.includes("Could not resolve")) {
-        error.type = "import";
+      if (line.includes("Cannot find module") || line.includes("Module not found") ||
+        line.includes("Could not resolve") || line.includes("failed to resolve")) {
+        error.type = "dependency";
         error.severity = "critical";
         error.fixable = true;
         const match = line.match(/['"]([^'"]+)['"]/);
@@ -53,7 +66,7 @@ function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildErr
         error.type = "missing_file";
         error.severity = "critical";
         error.fixable = true;
-      } else if (line.includes("dependency")) {
+      } else if (line.includes("dependency") || line.includes("dependencies")) {
         error.type = "dependency";
         error.severity = "major";
         error.fixable = true;
@@ -69,7 +82,13 @@ function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildErr
         error.line = parseInt(fileMatch[3], 10);
       }
 
-      errors.push(error);
+      const isDuplicate = errors.some(e =>
+        e.message === error.message && e.file === error.file && e.line === error.line
+      );
+
+      if (!isDuplicate) {
+        errors.push(error);
+      }
     }
   }
 
@@ -277,8 +296,8 @@ export const validateBuild = tool(
 );
 
 export async function validateBuildNode(
-  state: GraphState,
-): Promise<Partial<GraphState>> {
+  state: WorkflowState,
+): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "validating",
     message: "Validating build...",
@@ -309,6 +328,18 @@ export async function validateBuildNode(
 
   const errorCount = result.errors?.length || 0;
   const fixableCount = result.errorAnalysis?.fixableCount || 0;
+
+  if (errorCount === 0) {
+    sendSSEMessage(state.clientId, {
+      type: "validation_success",
+      message: "Build validation successful - no errors found",
+    });
+    return {
+      buildStatus: "success",
+      buildErrors: [],
+      error: undefined,
+    };
+  }
 
   sendSSEMessage(state.clientId, {
     type: "validation_errors",

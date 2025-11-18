@@ -28,7 +28,7 @@ analyze
                     │
           ┌─────────┼─────────┐
           │         │         │
-    buildStatus     │   iterations >= 8
+    buildStatus     │         |
     === "success"   │         │
           │         │         │
           ▼         ▼         ▼

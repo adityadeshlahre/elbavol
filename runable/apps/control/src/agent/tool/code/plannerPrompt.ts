@@ -3,7 +3,7 @@ import * as z from "zod";
 import { model } from "@/agent/client";
 import { SYSTEM_PROMPTS } from "@/prompt";
 import { sendSSEMessage } from "@/sse";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/main";
 
 const plannerPromptInput = z.object({
   prompt: z.string().min(1, "Prompt is required"),
@@ -49,7 +49,7 @@ export const plannerPromptTool = tool(
 );
 
 
-export async function planChanges(state: GraphState): Promise<Partial<GraphState>> {
+export async function planChanges(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "planning",
     message: "Planning changes...",
@@ -61,7 +61,6 @@ export async function planChanges(state: GraphState): Promise<Partial<GraphState
   });
   const plan = result.success ? result.plan : "Default plan";
   return {
-    generatedPlan: plan,
-    accumulatedResponses: result.success ? [`Planning: ${result.plan}`] : [],
+    plan: plan,
   };
 }

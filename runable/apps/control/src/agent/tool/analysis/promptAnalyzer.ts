@@ -1,7 +1,7 @@
 import { tool } from "langchain";
 import * as z from "zod";
 import { SYSTEM_PROMPTS } from "../../../prompt";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/main";
 import { sendSSEMessage } from "@/sse";
 
 const promptAnalyzerInput = z.object({
@@ -43,7 +43,7 @@ export const promptAnalyzer = tool(
   },
 );
 
-export async function analyzePrompt(state: GraphState): Promise<Partial<GraphState>> {
+export async function analyzePrompt(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "analyzing",
     message: "Analyzing prompt...",

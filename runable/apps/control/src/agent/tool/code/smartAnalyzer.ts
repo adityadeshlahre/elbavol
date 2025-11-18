@@ -2,7 +2,7 @@ import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
 import { sendSSEMessage } from "@/sse";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 
 const smartAnalyzerInput = z.object({
     prompt: z.string().min(1, "Prompt is required"),
@@ -255,7 +255,7 @@ Remember:
     },
 );
 
-export async function smartAnalyzeAndPlanNode(state: GraphState): Promise<Partial<GraphState>> {
+export async function smartAnalyzeAndPlanNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
     sendSSEMessage(state.clientId, {
         type: "analyzing_and_planning",
         message: "Analyzing prompt and creating execution plan...",
@@ -278,7 +278,7 @@ export async function smartAnalyzeAndPlanNode(state: GraphState): Promise<Partia
             error: result.error || "Failed to analyze and plan",
             analysis: { intent: "general", complexity: "medium", needsEnhancement: false },
             enhancedPrompt: state.prompt,
-            generatedPlan: "Create the requested application using available tools.",
+            plan: "Create the requested application using available tools.",
         };
     }
 
@@ -291,8 +291,7 @@ export async function smartAnalyzeAndPlanNode(state: GraphState): Promise<Partia
     return {
         analysis: result.analysis,
         enhancedPrompt: result.enhancedPrompt,
-        generatedPlan: result.plan,
+        plan: result.plan,
         toolCalls: result.toolCalls,
-        accumulatedResponses: [`Analysis: ${result.analysis.intent} (${result.analysis.complexity} complexity)`, `Plan: ${result.plan}`],
     };
 }

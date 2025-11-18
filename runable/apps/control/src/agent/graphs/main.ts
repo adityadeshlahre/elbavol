@@ -15,6 +15,8 @@ import { testBuild } from "../tool/dry/testBuild";
 import { updateFile } from "../tool/dry/updateFile";
 import { writeMultipleFile } from "../tool/dry/writeMultipleFile";
 import { pushFilesToR2 } from "../tool/r2/push";
+import type { WorkflowState } from "./main";
+import { executeWorkflow } from "./main";
 
 export const allTools = [
   promptAnalyzer,
@@ -37,24 +39,10 @@ export const allTools = [
   pushFilesToR2,
 ];
 
-export interface GraphState {
-  projectId: string;
-  prompt: string;
-  analysis?: any;
-  enhancedPrompt?: string;
-  generatedPlan?: string;
-  toolCalls?: any[];
-  context?: any;
-  toolResults?: any[];
-  buildStatus?: string;
-  buildErrors?: any[];
-  errorAnalysis?: any;
-  progressTracking?: any;
-  completed: boolean;
-  error?: string;
-  pushResult?: any;
-  clientId: string;
-  accumulatedResponses: string[];
-  messages?: Array<{ role: string; content: string }>;
-  threadId?: string;
+export type { WorkflowState } from "./workflow";
+
+export { executeWorkflow } from "./workflow";
+
+export async function executeMainFlow(initialState: WorkflowState): Promise<WorkflowState> {
+  return await executeWorkflow(initialState);
 }

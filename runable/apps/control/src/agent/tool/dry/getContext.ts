@@ -1,9 +1,54 @@
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 import { sendSSEMessage } from "@/sse";
 import fs from "fs";
 import { tool } from "langchain";
 import path from "path";
 import * as z from "zod";
+
+const IGNORE_PATTERNS = [
+  'node_modules',
+  '.turbo',
+  'dist',
+  'dist-ssr',
+  'build',
+  'out',
+  'coverage',
+  '.nyc_output',
+  '.cache',
+  'tmp',
+  'temp',
+  '.git',
+  '.env',
+  '.env.local',
+  '.env.development.local',
+  '.env.test.local',
+  '.env.production.local',
+  '.DS_Store',
+  '*.log',
+  '*.tsbuildinfo',
+  '*.tgz',
+  '.vscode',
+  '.idea',
+  '*.swp',
+  '*.swo',
+  'logs',
+  '.pnp',
+  '.pnp.js',
+  '*.local',
+  'bun.lockb'
+];
+
+function shouldIgnoreFile(filePath: string): boolean {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+
+  return IGNORE_PATTERNS.some(pattern => {
+    if (pattern.includes('*')) {
+      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+      return regex.test(normalizedPath);
+    }
+    return normalizedPath.includes(pattern);
+  });
+}
 
 const getContextInput = z.object({
   projectId: z.string(),
@@ -54,18 +99,18 @@ export const getContext = tool(
     try {
       if (fs.existsSync(projectDir)) {
         context.baseTemplate.exists = true;
-        
-        const files = fs.readdirSync(projectDir, { recursive: true });
-        context.metadata.totalFiles = files.length;
 
+        const files = fs.readdirSync(projectDir, { recursive: true });
         const fileList = files
-          .filter((file: any) => !file.includes('node_modules') && !file.includes('.turbo'))
-          .map((file: any) => typeof file === 'string' ? file : file.toString());
-        
+          .map((file: any) => typeof file === 'string' ? file : file.toString())
+          .filter((file: string) => !shouldIgnoreFile(file));
+
+        context.metadata.totalFiles = fileList.length;
+
         context.fileStructure = {
           root: projectDir,
-          files: fileList.slice(0, 50),
-          hasMore: fileList.length > 50
+          files: fileList.slice(0, 100),
+          hasMore: fileList.length > 100
         };
 
         const keyFiles = [
@@ -77,12 +122,26 @@ export const getContext = tool(
           "src/lib/utils.js",
           "components.json"
         ];
-        
+
+        const MAX_FILE_SIZE = 50 * 1024;
+
         for (const file of keyFiles) {
           const filePath = path.join(projectDir, file);
           if (fs.existsSync(filePath)) {
+            const stats = fs.statSync(filePath);
+
+            if (stats.size > MAX_FILE_SIZE) {
+              context.currentFiles[file] = `[File too large: ${(stats.size / 1024).toFixed(2)}KB]`;
+              continue;
+            }
+
             const content = fs.readFileSync(filePath, "utf8");
-            context.currentFiles[file] = content;
+
+            if (content.length > 10000) {
+              context.currentFiles[file] = content.slice(0, 10000) + "\n\n... [truncated]";
+            } else {
+              context.currentFiles[file] = content;
+            }
           }
         }
 
@@ -122,8 +181,8 @@ export const getContext = tool(
 
 
 export async function getProjectContext(
-  state: GraphState,
-): Promise<Partial<GraphState>> {
+  state: WorkflowState,
+): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "context",
     message: "Getting project context...",

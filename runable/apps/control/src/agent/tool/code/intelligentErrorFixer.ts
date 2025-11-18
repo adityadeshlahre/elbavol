@@ -2,7 +2,7 @@ import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
 import { sendSSEMessage } from "@/sse";
-import type { GraphState } from "@/agent/graphs/main";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 
 const errorFixerInput = z.object({
   projectId: z.string(),
@@ -15,29 +15,41 @@ const errorFixerInput = z.object({
 function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
   const fixPlan: any[] = [];
 
-  const dependencyErrors = errors.filter(e =>
-    e.type === 'dependency' ||
-    e.message?.includes('Cannot find module') ||
-    e.message?.includes('not found')
-  );
+  const buildErrorPattern = /failed to resolve import ["']([^"']+)["']/i;
+  const moduleNotFoundPattern = /Cannot find module ["']([^"']+)["']/i;
 
-  if (dependencyErrors.length > 0) {
-    const missingPackages = dependencyErrors
-      .map(e => {
-        const match = e.message?.match(/['"]([^'"]+)['"]/);
-        return match ? match[1] : null;
-      })
-      .filter(Boolean);
+  const allMissingPackages = new Set<string>();
 
-    if (missingPackages.length > 0) {
-      fixPlan.push({
-        priority: 1,
-        action: "addDependency",
-        target: missingPackages.join(", "),
-        description: "Install missing dependencies",
-        details: { packages: missingPackages }
-      });
+  for (const error of errors) {
+    const errorMsg = error.message || error.error || String(error);
+
+    let match = errorMsg.match(buildErrorPattern);
+    if (match && match[1]) {
+      allMissingPackages.add(match[1]);
     }
+
+    match = errorMsg.match(moduleNotFoundPattern);
+    if (match && match[1]) {
+      allMissingPackages.add(match[1]);
+    }
+
+    if (error.type === 'dependency' || errorMsg.includes('not found')) {
+      match = errorMsg.match(/['"]([^'"]+)['"]/);
+      if (match && match[1]) {
+        allMissingPackages.add(match[1]);
+      }
+    }
+  }
+
+  if (allMissingPackages.size > 0) {
+    const packages = Array.from(allMissingPackages);
+    fixPlan.push({
+      priority: 1,
+      action: "addDependency",
+      target: packages.join(", "),
+      description: `Install missing dependencies: ${packages.join(", ")}`,
+      details: { packages }
+    });
   }
 
   const importErrors = errors.filter(e => e.type === 'import');
@@ -54,7 +66,7 @@ function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
           error.message?.match(/@\/components\/ui\/([^'"\s]+)/);
         if (match) {
           const componentName = match[2] || match[1];
-          if (componentName) {
+          if (componentName && componentName !== 'button' && componentName !== 'card') {
             componentsToAdd.add(componentName);
           }
         }
@@ -62,23 +74,25 @@ function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
 
       if (componentsToAdd.size > 0) {
         fixPlan.push({
-          priority: 1,
+          priority: 2,
           action: "executeCommand",
           target: Array.from(componentsToAdd).join(", "),
           description: `Add missing shadcn/ui components: ${Array.from(componentsToAdd).join(", ")}`,
           details: {
-            command: `bunx --bun shadcn@latest add ${Array.from(componentsToAdd).join(" ")}`
+            command: `bunx --bun shadcn@latest add ${Array.from(componentsToAdd).join(" ")} --yes`
           }
         });
       }
     }
-  } else {
+  }
+
+  if (fixPlan.length === 0 && errors.length > 0) {
     fixPlan.push({
-      priority: 2,
+      priority: 3,
       action: "executeCommand",
-      target: "src/",
-      description: "Run build to regenerate imports",
-      details: { command: "bun run build" }
+      target: "dependencies",
+      description: "Reinstall dependencies to fix module resolution",
+      details: { command: "bun install" }
     });
   }
 
@@ -89,9 +103,21 @@ export const intelligentErrorFixer = tool(
   async (input: z.infer<typeof errorFixerInput>) => {
     const { errors, errorAnalysis, context, previousAttempts } = errorFixerInput.parse(input);
 
+    const normalizedErrors = errors.map((err: any) => {
+      if (typeof err === 'string') {
+        return {
+          type: 'unknown',
+          severity: 'major',
+          message: err,
+          fixable: true
+        };
+      }
+      return err;
+    });
+
     const errorSummary = `
 Build Errors Analysis:
-- Total Errors: ${errorAnalysis?.totalErrors || errors.length}
+- Total Errors: ${errorAnalysis?.totalErrors || normalizedErrors.length}
 - Critical: ${errorAnalysis?.criticalCount || 0}
 - Major: ${errorAnalysis?.majorCount || 0}
 - Minor: ${errorAnalysis?.minorCount || 0}
@@ -104,7 +130,7 @@ ${Object.entries(errorAnalysis?.errorsByType || {})
         .join('\n')}
 
 Detailed Errors:
-${errors.slice(0, 10).map((err, idx) => `${idx + 1}. [${err.severity}] ${err.type}: ${err.message}${err.file ? ` (${err.file}${err.line ? `:${err.line}` : ''})` : ''}`).join('\n')}
+${normalizedErrors.slice(0, 10).map((err, idx) => `${idx + 1}. [${err.severity}] ${err.type}: ${err.message}${err.file ? ` (${err.file}${err.line ? `:${err.line}` : ''})` : ''}`).join('\n')}
 
 ${previousAttempts && previousAttempts.length > 0 ? `
 Previous Fix Attempts (that failed):
@@ -187,7 +213,7 @@ CRITICAL: Return ONLY valid JSON array, no markdown, no explanations, just the J
 
         // Fallback: Create a simple fix plan based on error types
         console.log("Creating fallback fix plan...");
-        fixPlan = createFallbackFixPlan(errors, errorAnalysis);
+        fixPlan = createFallbackFixPlan(normalizedErrors, errorAnalysis);
 
         if (fixPlan.length === 0) {
           return {
@@ -219,7 +245,7 @@ CRITICAL: Return ONLY valid JSON array, no markdown, no explanations, just the J
   },
 );
 
-export async function intelligentFixErrorsNode(state: GraphState): Promise<Partial<GraphState>> {
+export async function intelligentFixErrorsNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "fixing",
     message: "Analyzing errors with AI...",
@@ -313,6 +339,5 @@ export async function intelligentFixErrorsNode(state: GraphState): Promise<Parti
 
   return {
     toolResults: fixResults,
-    accumulatedResponses: [`Applied ${successCount}/${fixResults.length} error fixes`],
   };
 }
