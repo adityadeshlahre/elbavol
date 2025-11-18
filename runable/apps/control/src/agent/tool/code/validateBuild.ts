@@ -33,13 +33,13 @@ function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildErr
         fixable: true,
       };
 
-      if (line.includes("Cannot find module") || line.includes("Module not found")) {
+      if (line.includes("Cannot find module") || line.includes("Module not found") || line.includes("Could not resolve")) {
         error.type = "import";
         error.severity = "critical";
         error.fixable = true;
-        const match = line.match(/'([^']+)'/);
+        const match = line.match(/['"]([^'"]+)['"]/);
         if (match) {
-          error.message = `Cannot find module: ${match[1]}`;
+          error.message = `Cannot resolve module: ${match[1]}`;
         }
       } else if (line.includes("TS") || line.includes("Type") || line.includes("type")) {
         error.type = "typescript";
@@ -53,7 +53,7 @@ function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildErr
         error.type = "missing_file";
         error.severity = "critical";
         error.fixable = true;
-      } else if (line.includes("Cannot resolve") || line.includes("dependency")) {
+      } else if (line.includes("dependency")) {
         error.type = "dependency";
         error.severity = "major";
         error.fixable = true;
@@ -119,7 +119,7 @@ export const validateBuild = tool(
         };
       }
 
-      const essentialFiles = ["package.json", "src/App.tsx", "src/index.tsx"];
+      const essentialFiles = ["package.json", "src/App.jsx", "src/index.jsx"];
       const missingFiles = essentialFiles.filter(file => !fs.existsSync(path.join(projectDir, file)));
 
       if (missingFiles.length > 0) {
@@ -157,6 +157,23 @@ export const validateBuild = tool(
       }
 
       const { spawn } = await import("child_process");
+
+      const installProcess = spawn("bun", ["install"], {
+        cwd: projectDir,
+        stdio: "pipe",
+      });
+
+      await new Promise((resolve, reject) => {
+        installProcess.on("close", (code) => {
+          if (code === 0) {
+            resolve(code);
+          } else {
+            reject(new Error("Failed to install dependencies"));
+          }
+        });
+        installProcess.on("error", reject);
+      });
+
       const buildProcess = spawn("bun", ["run", "build"], {
         cwd: projectDir,
         stdio: "pipe",
@@ -213,7 +230,7 @@ export const validateBuild = tool(
           } else {
             const parsedErrors = parseAndCategorizeBuildErrors(stderr, stdout);
             const errorAnalysis = categorizeBuildResult(parsedErrors);
-            
+
             resolve({
               success: false,
               message: `Build failed with ${parsedErrors.length} error(s)`,
@@ -266,18 +283,18 @@ export async function validateBuildNode(
     type: "validating",
     message: "Validating build...",
   });
-  
+
   const result = await validateBuild.invoke({
     projectId: state.projectId,
     userInstructions: state.prompt,
-  }) as { 
-    success: boolean; 
-    message?: string; 
+  }) as {
+    success: boolean;
+    message?: string;
     error?: string;
     errors?: BuildError[];
     errorAnalysis?: any;
   };
-  
+
   if (result.success) {
     sendSSEMessage(state.clientId, {
       type: "validation_success",
@@ -289,17 +306,17 @@ export async function validateBuildNode(
       error: undefined,
     };
   }
-  
+
   const errorCount = result.errors?.length || 0;
   const fixableCount = result.errorAnalysis?.fixableCount || 0;
-  
+
   sendSSEMessage(state.clientId, {
     type: "validation_errors",
     message: `Build validation found ${errorCount} error(s), ${fixableCount} fixable`,
     errors: result.errors,
     errorAnalysis: result.errorAnalysis,
   });
-  
+
   return {
     buildStatus: "errors",
     buildErrors: result.errors || [],

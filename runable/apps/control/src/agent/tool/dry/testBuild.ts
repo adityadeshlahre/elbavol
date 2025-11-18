@@ -17,10 +17,23 @@ export const testBuild = tool(
     const sharedDir = process.env.SHARED_DIR || "/app/shared";
     const projectDir = path.join(sharedDir, projectId);
     const workingDir = cwd ? path.join(projectDir, cwd) : projectDir;
-    const command = action === "build" ? "bun run build" : "bun run test";
 
     try {
-      const proc = spawn("sh", ["-c", command], { cwd: workingDir });
+      const installProc = spawn("bun", ["install"], { cwd: workingDir });
+      const installExitCode: number = await new Promise((resolve) => {
+        installProc.on("close", resolve);
+        installProc.on("error", () => resolve(1));
+      });
+
+      if (installExitCode !== 0) {
+        return {
+          success: false,
+          error: `Failed to install dependencies before ${action}`,
+        };
+      }
+
+      const args = action === "build" ? ["run", "build"] : ["run", "test"];
+      const proc = spawn("bun", args, { cwd: workingDir });
 
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];

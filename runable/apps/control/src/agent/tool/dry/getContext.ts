@@ -20,12 +20,12 @@ export const getContext = tool(
       projectPath: projectDir,
       baseTemplate: {
         exists: false,
-        description: "React 19 + TypeScript + Bun + Tailwind CSS v4 + shadcn/ui base template",
+        description: "React 19 + JavaScript + Bun + Tailwind CSS v4 + shadcn/ui base template",
         features: [
-          "React 19 with TypeScript",
+          "React 19 with JavaScript",
           "Bun runtime and package manager",
           "Tailwind CSS v4 (latest)",
-          "shadcn/ui components (Button, Card, Input, Label, Select, Textarea)",
+          "shadcn/ui components (Button, Card, Input, Label, Textarea)",
           "Lucide React icons",
           "Hot reload enabled",
           "Pre-configured build system"
@@ -35,7 +35,6 @@ export const getContext = tool(
           "@/components/ui/card - Card component",
           "@/components/ui/input - Input component",
           "@/components/ui/label - Label component",
-          "@/components/ui/select - Select component",
           "@/components/ui/textarea - Textarea component"
         ],
         utilities: [
@@ -70,12 +69,12 @@ export const getContext = tool(
         };
 
         const keyFiles = [
-          "package.json", 
-          "src/App.tsx", 
-          "src/index.tsx",
-          "src/index.ts",
+          "package.json",
+          "src/App.jsx",
+          "src/index.jsx",
+          "src/index.js",
           "src/index.css",
-          "src/lib/utils.ts",
+          "src/lib/utils.js",
           "components.json"
         ];
         
@@ -90,8 +89,8 @@ export const getContext = tool(
         const componentsUiDir = path.join(projectDir, "src/components/ui");
         if (fs.existsSync(componentsUiDir)) {
           const uiComponents = fs.readdirSync(componentsUiDir)
-            .filter(file => file.endsWith('.tsx'))
-            .map(file => file.replace('.tsx', ''));
+            .filter(file => file.endsWith('.jsx'))
+            .map(file => file.replace('.jsx', ''));
           context.baseTemplate.installedComponents = uiComponents;
         }
 

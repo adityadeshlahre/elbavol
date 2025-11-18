@@ -18,33 +18,33 @@ export const smartAnalyzeAndPlan = tool(
 
 CRITICAL CONTEXT - READ THIS FIRST:
 - A BASE TEMPLATE ALREADY EXISTS at SHARED_DIR/projectId
-- The project is ALREADY SET UP with React 19, TypeScript, Bun, Tailwind CSS v4, and shadcn/ui
+- The project is ALREADY SET UP with React 19, JavaScript, Bun, Tailwind CSS v4, and shadcn/ui
 - DO NOT create a new React project (no create-react-app, no vite create, no npm init)
 - DO NOT reinstall existing packages that are already in package.json
 - DO NOT run npm/bun install unless adding NEW packages
 - You MUST work on top of the EXISTING base template
 
 BASE TEMPLATE INCLUDES:
-✅ React 19 with TypeScript - ALREADY INSTALLED
+✅ React 19 with JavaScript - ALREADY INSTALLED
 ✅ Bun runtime and package manager - ALREADY CONFIGURED
 ✅ Tailwind CSS v4 (latest) - ALREADY INSTALLED AND CONFIGURED
-✅ shadcn/ui components - Button, Card, Input, Label, Select, Textarea - ALREADY AVAILABLE
+✅ shadcn/ui components - Button, Card, Input, Label, Textarea - ALREADY AVAILABLE
 ✅ Lucide React icons - ALREADY INSTALLED
 ✅ For new shadcn components: Use \`bunx --bun shadcn@latest add <component-name>\` from https://ui.shadcn.com/docs/components
 ✅ Hot reload with bun --hot - ALREADY RUNNING
-✅ Build system with build.ts - ALREADY CONFIGURED
+✅ Build system with build.js - ALREADY CONFIGURED
 ✅ Utility functions: cn() in @/lib/utils - ALREADY AVAILABLE
 
 EXISTING FILE STRUCTURE:
 - package.json (with all dependencies)
-- src/App.tsx (main app component)
-- src/index.tsx or src/index.ts (entry point)
+- src/App.jsx (main app component)
+- src/index.jsx or src/index.js (entry point)
 - src/index.css (Tailwind CSS configured)
 - src/components/ (for custom components)
 - src/components/ui/ (shadcn/ui components)
-- src/lib/utils.ts (utility functions)
-- build.ts (build script)
-- tsconfig.json, bunfig.toml, components.json
+- src/lib/utils.js (utility functions)
+- build.js (build script)
+- bunfig.toml, components.json
 
 YOUR WORKFLOW - FOLLOW THIS STRICTLY:
 1. FIRST: Read existing files to understand current structure
@@ -83,11 +83,11 @@ Return a JSON object with this exact structure:
     },
     {
       "tool": "readFile",
-      "args": { "filePath": "src/App.tsx" }
+      "args": { "filePath": "src/App.jsx" }
     },
     {
       "tool": "updateFile",
-      "args": { "filePath": "src/App.tsx", "content": "modified React component code" }
+      "args": { "filePath": "src/App.jsx", "content": "modified React component code" }
     }
   ]
 }
@@ -111,14 +111,16 @@ Available tools and their arguments:
 
 MANDATORY FIRST STEPS IN EVERY PLAN:
 1. listDir({ directory: "." }) - See what exists
-2. readFile({ filePath: "package.json" }) - Check dependencies
-3. readFile({ filePath: "src/App.tsx" }) - Understand current app
+2. listDir({ directory: "src/components/ui" }) - Check available UI components
+3. listDir({ directory: "src/components/" }) - Check available components
+4. readFile({ filePath: "package.json" }) - Check dependencies
+5. readFile({ filePath: "src/App.jsx" }) - Understand current app
 
 Then modify/add files based on what you found.
 
 BEAUTIFUL UI DESIGN REQUIREMENTS:
 - Use Tailwind CSS for stunning visuals: gradients (bg-gradient-to-r from-blue-500 to-purple-600), shadows (shadow-2xl), animations (animate-pulse), hover effects (hover:scale-105)
-- Prefer existing shadcn/ui components (Button, Card, Input, Label, Select, Textarea) over custom ones
+- Prefer existing shadcn/ui components (Button, Card, Input, Label, Textarea) over custom ones
 - Add Lucide icons for better UX
 - Create responsive, modern designs with proper spacing and colors
 - For new components: \`bunx --bun shadcn@latest add <component-name>\` if needed from https://ui.shadcn.com/docs/components
@@ -153,8 +155,8 @@ ${Object.keys(context.currentFiles || {}).map(file => `- ${file}: ${(context.cur
                     role: "user",
                     content: `User Request: ${prompt}${contextInfo}
 
-Remember: 
-1. The base template ALREADY EXISTS with React, TypeScript, Bun, Tailwind CSS v4, shadcn/ui
+Remember:
+1. The base template ALREADY EXISTS with React, JavaScript, Bun, Tailwind CSS v4, shadcn/ui
 2. DO NOT create new project or reinstall existing packages
 3. Start by reading existing files (listDir, readFile)
 4. Modify existing files with updateFile, only use createFile for NEW files
@@ -214,16 +216,17 @@ Remember:
                     plan: `Based on the prompt: "${prompt}", modify the existing React template with the following steps:
 1. List existing project structure to understand what's there
 2. Read package.json to see installed dependencies
-3. Read src/App.tsx to understand current app structure
+3. Read src/App.jsx to understand current app structure
 4. Read other relevant files as needed
 5. Modify/create components based on existing structure
 6. Test the build`,
                     toolCalls: [
                         { tool: "listDir", args: { directory: "." } },
                         { tool: "listDir", args: { directory: "src" } },
-                        { tool: "listDir", args: { directory: "src/components" } },
+                        { tool: "listDir", args: { directory: "src/components" } }, ,
+                        { tool: "listDir", args: { directory: "src/components/ui" } },
                         { tool: "readFile", args: { filePath: "package.json" } },
-                        { tool: "readFile", args: { filePath: "src/App.tsx" } },
+                        { tool: "readFile", args: { filePath: "src/App.jsx" } },
                         { tool: "readFile", args: { filePath: "src/index.css" } }
                     ]
                 };

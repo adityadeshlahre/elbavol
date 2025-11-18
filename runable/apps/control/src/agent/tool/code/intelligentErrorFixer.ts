@@ -15,12 +15,12 @@ const errorFixerInput = z.object({
 function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
   const fixPlan: any[] = [];
 
-  const dependencyErrors = errors.filter(e => 
-    e.type === 'dependency' || 
+  const dependencyErrors = errors.filter(e =>
+    e.type === 'dependency' ||
     e.message?.includes('Cannot find module') ||
     e.message?.includes('not found')
   );
-  
+
   if (dependencyErrors.length > 0) {
     const missingPackages = dependencyErrors
       .map(e => {
@@ -28,7 +28,7 @@ function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
         return match ? match[1] : null;
       })
       .filter(Boolean);
-    
+
     if (missingPackages.length > 0) {
       fixPlan.push({
         priority: 1,
@@ -42,6 +42,37 @@ function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
 
   const importErrors = errors.filter(e => e.type === 'import');
   if (importErrors.length > 0) {
+    const uiComponentErrors = importErrors.filter(e =>
+      e.message?.includes('@/components/ui/') ||
+      e.message?.includes('components/ui/')
+    );
+
+    if (uiComponentErrors.length > 0) {
+      const componentsToAdd = new Set<string>();
+      for (const error of uiComponentErrors) {
+        const match = error.message?.match(/['"]([^'"]*components\/ui\/([^'"]+))['"]/) ||
+          error.message?.match(/@\/components\/ui\/([^'"\s]+)/);
+        if (match) {
+          const componentName = match[2] || match[1];
+          if (componentName) {
+            componentsToAdd.add(componentName);
+          }
+        }
+      }
+
+      if (componentsToAdd.size > 0) {
+        fixPlan.push({
+          priority: 1,
+          action: "executeCommand",
+          target: Array.from(componentsToAdd).join(", "),
+          description: `Add missing shadcn/ui components: ${Array.from(componentsToAdd).join(", ")}`,
+          details: {
+            command: `bunx --bun shadcn@latest add ${Array.from(componentsToAdd).join(" ")}`
+          }
+        });
+      }
+    }
+  } else {
     fixPlan.push({
       priority: 2,
       action: "executeCommand",
@@ -68,9 +99,9 @@ Build Errors Analysis:
 
 Error Types:
 ${Object.entries(errorAnalysis?.errorsByType || {})
-  .filter(([_, count]) => (count as number) > 0)
-  .map(([type, count]) => `- ${type}: ${count}`)
-  .join('\n')}
+        .filter(([_, count]) => (count as number) > 0)
+        .map(([type, count]) => `- ${type}: ${count}`)
+        .join('\n')}
 
 Detailed Errors:
 ${errors.slice(0, 10).map((err, idx) => `${idx + 1}. [${err.severity}] ${err.type}: ${err.message}${err.file ? ` (${err.file}${err.line ? `:${err.line}` : ''})` : ''}`).join('\n')}
@@ -84,14 +115,13 @@ Context:
 ${JSON.stringify(context, null, 2)}
 `;
 
-    const systemPrompt = `You are an expert TypeScript/React error fixer. Analyze the build errors and create a detailed fix plan.
+    const systemPrompt = `You are an expert JavaScript/React error fixer. Analyze the build errors and create a detailed fix plan.
 
 For each error type, provide specific tool calls to fix them:
 1. Import errors → use updateFile or createFile to add imports
-2. TypeScript errors → use updateFile to fix type annotations
-3. Syntax errors → use updateFile to fix syntax
-4. Missing files → use createFile to create missing files
-5. Dependency errors → use addDependency to add missing packages
+2. Syntax errors → use updateFile to fix syntax
+3. Missing files → use createFile to create missing files
+4. Dependency errors → use addDependency to add missing packages
 
 Return a JSON array of fix actions in this format:
 [
@@ -123,7 +153,7 @@ CRITICAL: Return ONLY valid JSON array, no markdown, no explanations, just the J
       let fixPlan;
       try {
         const text = response.text.trim();
-        
+
         // Try to extract JSON from markdown code blocks first
         let jsonText = text;
         const codeBlockMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
@@ -154,11 +184,11 @@ CRITICAL: Return ONLY valid JSON array, no markdown, no explanations, just the J
       } catch (parseError) {
         console.error("Failed to parse AI response as JSON:", parseError);
         console.error("AI response text:", response.text);
-        
+
         // Fallback: Create a simple fix plan based on error types
         console.log("Creating fallback fix plan...");
         fixPlan = createFallbackFixPlan(errors, errorAnalysis);
-        
+
         if (fixPlan.length === 0) {
           return {
             success: false,

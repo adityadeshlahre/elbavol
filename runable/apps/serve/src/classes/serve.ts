@@ -71,6 +71,9 @@ export const serveTheProject = async (
   } catch (error) {
     console.error(`Failed to free port ${port}:`, error);
   }
+  
+  const installProc = spawn("bun", ["install"], { cwd: dir });
+  await new Promise((resolve) => installProc.on("close", resolve));
 
   const proc = spawn("sh", ["-c", `cd "${dir}" && ${startScript}`], {
     cwd: dir,
@@ -78,7 +81,7 @@ export const serveTheProject = async (
 
   console.log(`Starting server for project ${projectId} on port ${port}`);
 
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  await new Promise((resolve) => setTimeout(resolve, 10000));
 
   const checkProc = spawn("nc", ["-z", "localhost", port.toString()]);
 
