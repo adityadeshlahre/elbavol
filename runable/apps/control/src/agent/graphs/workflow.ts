@@ -21,12 +21,16 @@ export interface WorkflowState {
     toolResults?: any[];
     buildStatus?: "pending" | "success" | "errors" | "tested";
     buildErrors?: any[];
+    buildOutput?: string;
     errorAnalysis?: any;
     fixAttempts: number;
     completed: boolean;
     error?: string;
     messages: Array<{ role: string; content: string }>;
     threadId: string;
+    toolsExecuted?: boolean;
+    fixesApplied?: boolean;
+    noFixesAvailable?: boolean;
 }
 
 async function analyzeNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
@@ -81,6 +85,14 @@ async function getContextNode(state: WorkflowState): Promise<Partial<WorkflowSta
 }
 
 async function executeNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
+    if (state.fixesApplied) {
+        sendSSEMessage(state.clientId, {
+            type: "skipping_execution",
+            message: "Skipping tool execution, re-validating after fixes...",
+        });
+        return { fixesApplied: false, toolsExecuted: true };
+    }
+
     sendSSEMessage(state.clientId, {
         type: "executing",
         message: "Executing tools...",
@@ -158,7 +170,7 @@ async function executeNode(state: WorkflowState): Promise<Partial<WorkflowState>
         message: `Executed ${toolResults.length} tools`,
     });
 
-    return { toolResults };
+    return { toolResults, toolsExecuted: true };
 }
 
 async function validateNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
@@ -196,8 +208,8 @@ async function validateNode(state: WorkflowState): Promise<Partial<WorkflowState
     return {
         buildStatus: "errors",
         buildErrors: result.errors || [],
+        buildOutput: result.error || result.buildOutput || "",
         errorAnalysis: result.errorAnalysis,
-        error: result.error || `Build has ${errorCount} errors`,
     };
 }
 
@@ -222,9 +234,18 @@ async function testBuildNode(state: WorkflowState): Promise<Partial<WorkflowStat
         message: "Build test failed",
     });
 
+    const errorDetails = result.stderr || result.error || "Test build failed";
+    console.log("[testBuildNode] Test build failed with error:", errorDetails.substring(0, 500));
+
     return {
         buildStatus: "errors",
-        error: result.stderr || result.error,
+        buildOutput: errorDetails,
+        buildErrors: [{
+            type: "test",
+            severity: "major",
+            message: errorDetails,
+            fixable: true
+        }],
     };
 }
 
@@ -234,11 +255,17 @@ async function fixErrorsNode(state: WorkflowState): Promise<Partial<WorkflowStat
         message: "Analyzing and fixing errors...",
     });
 
+    console.log("[fixErrorsNode] buildErrors:", JSON.stringify(state.buildErrors, null, 2));
+    console.log("[fixErrorsNode] buildOutput:", state.buildOutput?.substring(0, 500));
+
     const fixPlanResult = await intelligentErrorFixer.invoke({
         projectId: state.projectId,
         errors: state.buildErrors || [],
         errorAnalysis: state.errorAnalysis,
-        context: state.context,
+        context: {
+            ...state.context,
+            fullBuildError: state.buildOutput || state.error || "",
+        },
         previousAttempts: [],
     }) as any;
 
@@ -294,20 +321,36 @@ async function fixErrorsNode(state: WorkflowState): Promise<Partial<WorkflowStat
                         });
                         if (result.success) successCount++;
                     }
+                } else if (action.action === "replaceInFile" && action.details?.filePath) {
+                    const replaceTool = toolMap["replaceInFile"];
+                    if (replaceTool) {
+                        const result = await replaceTool.invoke({
+                            filePath: action.details.filePath,
+                            oldString: action.details.oldString,
+                            newString: action.details.newString,
+                        });
+                        if (result.success) successCount++;
+                    }
                 }
                 continue;
             }
 
+            console.log(`[fixErrorsNode] Invoking tool: ${action.action} with details:`, JSON.stringify(action.details).substring(0, 200));
             const result = await tool.invoke(action.details);
+            console.log(`[fixErrorsNode] Tool ${action.action} result:`, result);
+
             if (result?.success !== false) {
                 successCount++;
                 sendSSEMessage(state.clientId, {
                     type: "fix_success",
                     message: `✓ ${action.description || action.action}`,
                 });
+            } else {
+                console.warn(`[fixErrorsNode] Tool ${action.action} returned success=false:`, result);
             }
         } catch (error) {
-            console.error(`Fix action failed:`, error);
+            console.error(`[fixErrorsNode] Fix action failed for ${action.action}:`, error);
+            console.error(`[fixErrorsNode] Action details:`, JSON.stringify(action.details, null, 2));
             sendSSEMessage(state.clientId, {
                 type: "fix_error",
                 message: `✗ ${action.description || action.action}: ${error instanceof Error ? error.message : String(error)}`,
@@ -320,7 +363,21 @@ async function fixErrorsNode(state: WorkflowState): Promise<Partial<WorkflowStat
         message: `Applied ${successCount}/${fixPlanResult.fixPlan.length} fixes successfully`,
     });
 
-    return { fixAttempts: state.fixAttempts + 1 };
+    const noFixesGenerated = fixPlanResult.fixPlan.length === 0;
+
+    if (noFixesGenerated) {
+        console.warn("[fixErrorsNode] No fixes were generated by LLM or fallback!");
+        sendSSEMessage(state.clientId, {
+            type: "warning",
+            message: "No fixes could be generated for the errors. The LLM may not know how to fix this issue.",
+        });
+    }
+
+    return {
+        fixAttempts: state.fixAttempts + 1,
+        fixesApplied: !noFixesGenerated,
+        noFixesAvailable: noFixesGenerated && state.fixAttempts >= 2,
+    };
 }
 
 async function pushNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
@@ -438,6 +495,15 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
                 const errorMsg = "Build validation did not return success or errors status";
                 console.error(errorMsg, { buildStatus: state.buildStatus, buildErrors: state.buildErrors });
                 state.error = errorMsg;
+                break;
+            }
+
+            if (state.noFixesAvailable) {
+                state.error = "Unable to generate fixes for the errors. The LLM could not determine how to fix the issues.";
+                sendSSEMessage(state.clientId, {
+                    type: "error",
+                    message: state.error,
+                });
                 break;
             }
 

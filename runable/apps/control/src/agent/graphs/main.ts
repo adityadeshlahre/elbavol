@@ -13,6 +13,7 @@ import { readFile } from "../tool/dry/readFile";
 import { saveContext } from "../tool/dry/saveContext";
 import { testBuild } from "../tool/dry/testBuild";
 import { updateFile } from "../tool/dry/updateFile";
+import { replaceInFile } from "../tool/dry/replaceInFile";
 import { writeMultipleFile } from "../tool/dry/writeMultipleFile";
 import { pushFilesToR2 } from "../tool/r2/push";
 import type { WorkflowState } from "./main";
@@ -35,6 +36,7 @@ export const allTools = [
   saveContext,
   testBuild,
   updateFile,
+  replaceInFile,
   writeMultipleFile,
   pushFilesToR2,
 ];

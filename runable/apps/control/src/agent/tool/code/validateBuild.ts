@@ -74,6 +74,10 @@ function parseAndCategorizeBuildErrors(stderr: string, stdout: string): BuildErr
         error.type = "runtime";
         error.severity = "major";
         error.fixable = true;
+      } else if (line.includes("is not exported by") || line.includes("has no exported member")) {
+        error.type = "import";
+        error.severity = "major";
+        error.fixable = true;
       }
 
       const fileMatch = line.match(/([a-zA-Z0-9_\-\/\.]+\.(tsx?|jsx?|css)):(\d+)/);
@@ -250,13 +254,17 @@ export const validateBuild = tool(
             const parsedErrors = parseAndCategorizeBuildErrors(stderr, stdout);
             const errorAnalysis = categorizeBuildResult(parsedErrors);
 
+            console.log('[validateBuild] Build failed with exit code:', code);
+            console.log('[validateBuild] Parsed errors:', parsedErrors.length);
+            console.log('[validateBuild] stderr:', stderr.substring(0, 500));
+
             resolve({
               success: false,
               message: `Build failed with ${parsedErrors.length} error(s)`,
               projectId,
               userInstructions,
-              error: stderr || "Build failed",
-              buildOutput: stdout,
+              error: stderr || stdout || "Build failed",
+              buildOutput: stderr + "\n" + stdout,
               errors: parsedErrors,
               errorAnalysis,
             });

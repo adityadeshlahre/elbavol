@@ -54,25 +54,34 @@ func CreateProjectHandler(c echo.Context) error {
 	ch := make(chan string, 1)
 	responseManager.SetChannel(id, ch)
 
-	response := <-ch
-	log.Printf("Received response for project %s: %s", id, response)
+	log.Printf("Waiting for response for project %s (timeout: 30s)...", id)
 
-	if response == sharedTypes.PROJECT_CREATED {
-		go func() {
-			if file, err := os.Create("/tmp/" + id + ".txt"); err != nil {
-				log.Printf("Error creating file for project %s: %v", id, err)
-			} else {
-				file.Close()
-				log.Printf("Created project file for %s", id)
-			}
-		}()
+	select {
+	case response := <-ch:
+		log.Printf("Received response for project %s: %s", id, response)
 
-		log.Printf("Successfully created project %s", id)
-		return c.String(200, id)
+		if response == sharedTypes.PROJECT_CREATED {
+			go func() {
+				if file, err := os.Create("/tmp/" + id + ".txt"); err != nil {
+					log.Printf("Error creating file for project %s: %v", id, err)
+				} else {
+					file.Close()
+					log.Printf("Created project file for %s", id)
+				}
+			}()
+
+			log.Printf("Successfully created project %s", id)
+			return c.String(200, id)
+		}
+
+		log.Printf("Project creation failed for %s with response: %s", id, response)
+		return c.String(500, "Project creation failed: "+response)
+
+	case <-time.After(30 * time.Second):
+		log.Printf("Timeout waiting for response for project %s", id)
+		responseManager.CleanupChannel(id)
+		return c.String(500, "Project creation timed out")
 	}
-
-	log.Printf("Project creation failed for %s with response: %s", id, response)
-	return c.String(500, "Project creation failed: "+response)
 }
 
 func DeleteProjectHandler(c echo.Context) error {

@@ -12,36 +12,44 @@ const errorFixerInput = z.object({
   previousAttempts: z.array(z.string()).optional(),
 });
 
-function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
+function createFallbackFixPlan(errors: any[], _errorAnalysis: any, fullBuildError?: string): any[] {
   const fixPlan: any[] = [];
+
+  const allMissingPackages = new Set<string>();
+
+  if (fullBuildError) {
+    const vitePattern = /failed to resolve import ["']([^"']+)["']/gi;
+    let match;
+    while ((match = vitePattern.exec(fullBuildError)) !== null) {
+      if (match[1]) allMissingPackages.add(match[1]);
+    }
+
+    const modulePattern = /Cannot find module ["']([^"']+)["']/gi;
+    while ((match = modulePattern.exec(fullBuildError)) !== null) {
+      if (match[1]) allMissingPackages.add(match[1]);
+    }
+  }
 
   const buildErrorPattern = /failed to resolve import ["']([^"']+)["']/i;
   const moduleNotFoundPattern = /Cannot find module ["']([^"']+)["']/i;
 
-  const allMissingPackages = new Set<string>();
-
   for (const error of errors) {
     const errorMsg = error.message || error.error || String(error);
-
     let match = errorMsg.match(buildErrorPattern);
     if (match && match[1]) {
       allMissingPackages.add(match[1]);
     }
-
     match = errorMsg.match(moduleNotFoundPattern);
     if (match && match[1]) {
       allMissingPackages.add(match[1]);
     }
-
     if (error.type === 'dependency' || errorMsg.includes('not found')) {
       match = errorMsg.match(/['"]([^'"]+)['"]/);
       if (match && match[1]) {
         allMissingPackages.add(match[1]);
       }
     }
-  }
-
-  if (allMissingPackages.size > 0) {
+  } if (allMissingPackages.size > 0) {
     const packages = Array.from(allMissingPackages);
     fixPlan.push({
       priority: 1,
@@ -50,6 +58,69 @@ function createFallbackFixPlan(errors: any[], _errorAnalysis: any): any[] {
       description: `Install missing dependencies: ${packages.join(", ")}`,
       details: { packages }
     });
+  }
+
+  const exportErrorPattern = /"([^"]+)" is not exported by "([^"]+)"/i;
+  for (const error of errors) {
+    const errorMsg = error.message || error.error || String(error);
+    const match = errorMsg.match(exportErrorPattern);
+    if (match && match[1] && match[2]) {
+      const wrongExport = match[1];
+      const packageName = match[2];
+
+      if (packageName.includes('lucide-react')) {
+        let correctExport = wrongExport;
+        if (wrongExport === 'Tools') correctExport = 'Tool';
+        if (wrongExport === 'Settings') correctExport = 'Settings';
+        if (wrongExport === 'Icons') correctExport = 'Icon';
+
+        if (correctExport !== wrongExport && fullBuildError) {
+          const importPattern = new RegExp(`import\\s*{([^}]*\\b${wrongExport}\\b[^}]*)}\\s*from\\s*['"]${packageName.replace(/\//g, '\\/')}['"]`, 'i');
+          const importMatch = fullBuildError.match(importPattern);
+
+          if (importMatch) {
+            const oldImport = importMatch[0];
+            const newImport = oldImport.replace(wrongExport, correctExport);
+
+            fixPlan.push({
+              priority: 1,
+              action: "replaceInFile",
+              target: `Fix ${wrongExport} -> ${correctExport}`,
+              description: `Fix invalid export: ${wrongExport} should be ${correctExport} in ${packageName}`,
+              details: {
+                filePath: error.file || "src/components/ServicesSection.jsx",
+                oldString: oldImport,
+                newString: newImport
+              }
+            });
+
+            fixPlan.push({
+              priority: 2,
+              action: "replaceInFile",
+              target: `Fix JSX usage of ${wrongExport}`,
+              description: `Update JSX to use ${correctExport} instead of ${wrongExport}`,
+              details: {
+                filePath: error.file || "src/components/ServicesSection.jsx",
+                oldString: `<${wrongExport}`,
+                newString: `<${correctExport}`
+              }
+            });
+
+            fixPlan.push({
+              priority: 3,
+              action: "replaceInFile",
+              target: `Fix JSX closing tag of ${wrongExport}`,
+              description: `Update closing tag to use ${correctExport}`,
+              details: {
+                filePath: error.file || "src/components/ServicesSection.jsx",
+                oldString: `</${wrongExport}`,
+                newString: `</${correctExport}`
+              }
+            });
+          }
+        }
+      }
+    }
   }
 
   const importErrors = errors.filter(e => e.type === 'import');
@@ -115,7 +186,14 @@ export const intelligentErrorFixer = tool(
       return err;
     });
 
+    const fullBuildError = context?.fullBuildError || "";
+
     const errorSummary = `
+FULL BUILD ERROR OUTPUT:
+======================
+${fullBuildError}
+======================
+
 Build Errors Analysis:
 - Total Errors: ${errorAnalysis?.totalErrors || normalizedErrors.length}
 - Critical: ${errorAnalysis?.criticalCount || 0}
@@ -129,7 +207,7 @@ ${Object.entries(errorAnalysis?.errorsByType || {})
         .map(([type, count]) => `- ${type}: ${count}`)
         .join('\n')}
 
-Detailed Errors:
+Parsed Errors:
 ${normalizedErrors.slice(0, 10).map((err, idx) => `${idx + 1}. [${err.severity}] ${err.type}: ${err.message}${err.file ? ` (${err.file}${err.line ? `:${err.line}` : ''})` : ''}`).join('\n')}
 
 ${previousAttempts && previousAttempts.length > 0 ? `
@@ -137,32 +215,59 @@ Previous Fix Attempts (that failed):
 ${previousAttempts.map((attempt, idx) => `${idx + 1}. ${attempt}`).join('\n')}
 ` : ''}
 
-Context:
-${JSON.stringify(context, null, 2)}
+Project Context:
+- Available dependencies: ${context?.dependencies?.join(', ') || 'unknown'}
+- React version: ${context?.dependencies?.includes('react') ? 'installed' : 'check package.json'}
 `;
 
-    const systemPrompt = `You are an expert JavaScript/React error fixer. Analyze the build errors and create a detailed fix plan.
+    const systemPrompt = `You are an expert JavaScript/React error fixer. Analyze the FULL BUILD ERROR OUTPUT carefully to extract exact package names and create fixes.
 
-For each error type, provide specific tool calls to fix them:
-1. Import errors → use updateFile or createFile to add imports
-2. Syntax errors → use updateFile to fix syntax
-3. Missing files → use createFile to create missing files
-4. Dependency errors → use addDependency to add missing packages
+CRITICAL INSTRUCTIONS:
+1. Read the FULL BUILD ERROR OUTPUT section to find the EXACT package/module names
+2. For Vite/Rollup errors like "failed to resolve import '@radix-ui/react-label'":
+   - Extract the EXACT package name from the error (e.g., @radix-ui/react-label)
+   - Create an addDependency action with that exact package name
+3. For missing exports like '"Tools" is not exported by "lucide-react"':
+   - This means the import name is WRONG, not missing
+   - For lucide-react, common icons are: Tool (singular), Wrench, Hammer, Settings, Cog, HardHat
+   - Use replaceInFile action to fix the import statement
+   - Use replaceInFile action again to fix JSX usage
+4. Always prioritize addDependency for missing modules over other fixes
 
-Return a JSON array of fix actions in this format:
+Fix Action Types:
+- addDependency: { packages: ["exact-package-name"] } - For missing npm packages
+- replaceInFile: { filePath, oldString, newString } - For find-and-replace in files (fixing imports, renaming)
+- updateFile: { filePath, content } - For replacing entire file content
+- createFile: { filePath, content } - For creating missing files
+- executeCommand: { command } - For running shell commands
+
+RESPONSE FORMAT (return ONLY this JSON, no markdown, no backticks):
 [
   {
     "priority": 1,
-    "action": "updateFile" | "createFile" | "addDependency" | "executeCommand",
-    "target": "file path or package name",
-    "description": "what this fix does",
+    "action": "replaceInFile",
+    "target": "src/components/ServicesSection.jsx",
+    "description": "Fix invalid lucide-react import: Tools -> Tool",
     "details": {
-      // action-specific details
+      "filePath": "src/components/ServicesSection.jsx",
+      "oldString": "import { Construction, Building, Tools } from 'lucide-react';",
+      "newString": "import { Construction, Building, Tool } from 'lucide-react';"
+    }
+  },
+  {
+    "priority": 2,
+    "action": "replaceInFile",
+    "target": "src/components/ServicesSection.jsx",
+    "description": "Update JSX to use Tool instead of Tools",
+    "details": {
+      "filePath": "src/components/ServicesSection.jsx",
+      "oldString": "<Tools",
+      "newString": "<Tool"
     }
   }
 ]
 
-CRITICAL: Return ONLY valid JSON array, no markdown, no explanations, just the JSON array.`;
+CRITICAL: Return ONLY the JSON array. NO markdown code blocks, NO explanations, JUST the JSON array starting with [ and ending with ].`;
 
     try {
       const response = await model.invoke([
@@ -206,14 +311,17 @@ CRITICAL: Return ONLY valid JSON array, no markdown, no explanations, just the J
         if (!Array.isArray(fixPlan)) {
           throw new Error("Fix plan is not an array");
         }
+        
+        console.log("[intelligentErrorFixer] Successfully parsed fix plan with", fixPlan.length, "actions");
+        console.log("[intelligentErrorFixer] First action:", JSON.stringify(fixPlan[0], null, 2));
 
       } catch (parseError) {
-        console.error("Failed to parse AI response as JSON:", parseError);
-        console.error("AI response text:", response.text);
+        console.error("[intelligentErrorFixer] Failed to parse AI response as JSON:", parseError);
+        console.error("[intelligentErrorFixer] AI response text:", response.text);
 
         // Fallback: Create a simple fix plan based on error types
         console.log("Creating fallback fix plan...");
-        fixPlan = createFallbackFixPlan(normalizedErrors, errorAnalysis);
+        fixPlan = createFallbackFixPlan(normalizedErrors, errorAnalysis, fullBuildError);
 
         if (fixPlan.length === 0) {
           return {
