@@ -313,11 +313,11 @@ async function start() {
             }
             promptProcessing.add(projectId);
             try {
+              console.log("Agent processing started for project:", projectId);
               await processPrompt(projectId, prompt, producer);
             } finally {
               promptProcessing.delete(projectId);
             }
-            console.log("Agent processing started for project:", projectId);
           } else {
             console.log(
               `Received unknown message: ${value} for project: ${projectId} from ORCHESTRATOR_TO_CONTROL`,

@@ -173,14 +173,16 @@ export const buildSource = tool(
 );
 
 
-export async function runAppNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
+export async function runNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "running",
     message: "Running application...",
   });
+
   await buildSource.invoke({ projectId: state.projectId });
 
   const { MESSAGE_KEYS, TOPIC } = await import("@elbavol/constants");
+  const { producer } = await import("../../../index");
 
   await producer.send({
     topic: TOPIC.CONTROL_TO_SERVING,
@@ -195,6 +197,11 @@ export async function runAppNode(state: WorkflowState): Promise<Partial<Workflow
     ],
   });
 
-  return {};
+  sendSSEMessage(state.clientId, {
+    type: "completed",
+    message: "Workflow completed successfully",
+  });
+
+  return { completed: true };
 }
 

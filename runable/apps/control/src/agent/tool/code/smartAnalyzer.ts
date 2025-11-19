@@ -255,9 +255,9 @@ Remember:
     },
 );
 
-export async function smartAnalyzeAndPlanNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
+export async function analyzeNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
     sendSSEMessage(state.clientId, {
-        type: "analyzing_and_planning",
+        type: "analyzing",
         message: "Analyzing prompt and creating execution plan...",
     });
 
@@ -269,22 +269,20 @@ export async function smartAnalyzeAndPlanNode(state: WorkflowState): Promise<Par
 
     if (!result.success) {
         sendSSEMessage(state.clientId, {
-            type: "analysis_error",
+            type: "analysis_failed",
             message: "Failed to analyze and plan",
             error: result.error,
         });
 
         return {
-            error: result.error || "Failed to analyze and plan",
-            analysis: { intent: "general", complexity: "medium", needsEnhancement: false },
-            enhancedPrompt: state.prompt,
-            plan: "Create the requested application using available tools.",
+            error: result.error || "Analysis failed",
+            analysis: { needsEnhancement: false, intent: "general" },
         };
     }
 
     sendSSEMessage(state.clientId, {
-        type: "planning_complete",
-        message: `Plan created: ${result.analysis.estimatedSteps || 'multiple'} steps`,
+        type: "analysis_complete",
+        message: `Analysis complete: ${result.analysis.intent}`,
         analysis: result.analysis,
     });
 
@@ -294,4 +292,4 @@ export async function smartAnalyzeAndPlanNode(state: WorkflowState): Promise<Par
         plan: result.plan,
         toolCalls: result.toolCalls,
     };
-}
+};

@@ -142,14 +142,23 @@ function getContentType(filePath: string): string {
 }
 
 
-export async function pushToR2Node(state: WorkflowState): Promise<Partial<WorkflowState>> {
+export async function pushNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "pushing",
     message: "Pushing to storage...",
   });
+
   await pushFilesToR2.invoke({
     projectId: state.projectId,
     bucketName: "elbavol",
   });
+
+  sendSSEMessage(
+    state.clientId, {
+    type: "pushed",
+    message: "Pushed to storage",
+  }
+  );
+
   return {};
 }

@@ -303,9 +303,7 @@ export const validateBuild = tool(
   },
 );
 
-export async function validateBuildNode(
-  state: WorkflowState,
-): Promise<Partial<WorkflowState>> {
+export async function validateNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "validating",
     message: "Validating build...",
@@ -314,33 +312,14 @@ export async function validateBuildNode(
   const result = await validateBuild.invoke({
     projectId: state.projectId,
     userInstructions: state.prompt,
-  }) as {
-    success: boolean;
-    message?: string;
-    error?: string;
-    errors?: BuildError[];
-    errorAnalysis?: any;
-  };
-
-  if (result.success) {
-    sendSSEMessage(state.clientId, {
-      type: "validation_success",
-      message: "Build validation successful - no errors found",
-    });
-    return {
-      buildStatus: "success",
-      buildErrors: [],
-      error: undefined,
-    };
-  }
+  }) as any;
 
   const errorCount = result.errors?.length || 0;
-  const fixableCount = result.errorAnalysis?.fixableCount || 0;
 
-  if (errorCount === 0) {
+  if (result.success || errorCount === 0) {
     sendSSEMessage(state.clientId, {
       type: "validation_success",
-      message: "Build validation successful - no errors found",
+      message: "Build validation passed - no errors found",
     });
     return {
       buildStatus: "success",
@@ -350,8 +329,8 @@ export async function validateBuildNode(
   }
 
   sendSSEMessage(state.clientId, {
-    type: "validation_errors",
-    message: `Build validation found ${errorCount} error(s), ${fixableCount} fixable`,
+    type: "validation_failed",
+    message: `Build validation failed with ${errorCount} error(s)`,
     errors: result.errors,
     errorAnalysis: result.errorAnalysis,
   });
@@ -359,7 +338,7 @@ export async function validateBuildNode(
   return {
     buildStatus: "errors",
     buildErrors: result.errors || [],
+    buildOutput: result.error || result.buildOutput || "",
     errorAnalysis: result.errorAnalysis,
-    error: result.error || result.message || "Build validation failed",
   };
 }

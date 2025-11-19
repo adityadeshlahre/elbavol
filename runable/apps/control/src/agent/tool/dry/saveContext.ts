@@ -33,16 +33,21 @@ export const saveContext = tool(
   },
 );
 
-export async function saveContextNode(
-  state: WorkflowState,
-): Promise<Partial<WorkflowState>> {
+export async function saveNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "saving",
     message: "Saving context...",
   });
+
   await saveContext.invoke({
     context: state.context,
     filePath: `${state.projectId}/context.json`,
   });
-  return { completed: true };
+
+  sendSSEMessage(state.clientId, {
+    type: "completed",
+    message: "Context saved successfully",
+  });
+
+  return {};
 }

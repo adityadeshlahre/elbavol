@@ -72,44 +72,35 @@ export const testBuild = tool(
 export async function testBuildNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "testing",
-    message: "Testing build...",
+    message: "Running build test...",
   });
 
-  try {
-    const result = await testBuild.invoke({
-      action: "build",
-    });
+  const result = await testBuild.invoke({ action: "build" });
 
-    if (result.success) {
-      sendSSEMessage(state.clientId, {
-        type: "test_success",
-        message: "Build test passed successfully",
-      });
-      return {
-        buildStatus: "tested",
-        error: undefined,
-      };
-    } else {
-      sendSSEMessage(state.clientId, {
-        type: "test_failed",
-        message: "Build test failed",
-        error: result.stderr || result.error,
-      });
-      return {
-        buildStatus: "errors",
-        error: result.stderr || result.error,
-      };
-    }
-  } catch (error) {
-    console.error("Error in testBuildNode:", error);
+  if (result.success) {
     sendSSEMessage(state.clientId, {
-      type: "test_error",
-      message: "Test execution failed",
-      error: error instanceof Error ? error.message : String(error),
+      type: "test_success",
+      message: "Build test passed",
     });
-    return {
-      buildStatus: "errors",
-      error: error instanceof Error ? error.message : String(error),
-    };
+    return { buildStatus: "tested" };
   }
+
+  sendSSEMessage(state.clientId, {
+    type: "test_failed",
+    message: "Build test failed",
+  });
+
+  const errorDetails = result.stderr || result.error || "Test build failed";
+  console.log("[testBuildNode] Test build failed with error:", errorDetails.substring(0, 500));
+
+  return {
+    buildStatus: "errors",
+    buildOutput: errorDetails,
+    buildErrors: [{
+      type: "test",
+      severity: "major",
+      message: errorDetails,
+      fixable: true
+    }],
+  };
 }

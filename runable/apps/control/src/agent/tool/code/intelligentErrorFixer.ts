@@ -3,6 +3,7 @@ import * as z from "zod";
 import { model } from "@/agent/client";
 import { sendSSEMessage } from "@/sse";
 import type { WorkflowState } from "@/agent/graphs/workflow";
+import { allTools } from "@/agent/graphs/main";
 
 const errorFixerInput = z.object({
   projectId: z.string(),
@@ -311,7 +312,7 @@ CRITICAL: Return ONLY the JSON array. NO markdown code blocks, NO explanations, 
         if (!Array.isArray(fixPlan)) {
           throw new Error("Fix plan is not an array");
         }
-        
+
         console.log("[intelligentErrorFixer] Successfully parsed fix plan with", fixPlan.length, "actions");
         console.log("[intelligentErrorFixer] First action:", JSON.stringify(fixPlan[0], null, 2));
 
@@ -353,99 +354,133 @@ CRITICAL: Return ONLY the JSON array. NO markdown code blocks, NO explanations, 
   },
 );
 
-export async function intelligentFixErrorsNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
+export async function fixErrorsNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "fixing",
-    message: "Analyzing errors with AI...",
+    message: "Analyzing and fixing errors...",
   });
 
-  if (!state.buildErrors || state.buildErrors.length === 0) {
-    sendSSEMessage(state.clientId, {
-      type: "fixing",
-      message: "No build errors to fix",
-    });
-    return { buildStatus: "success" };
-  }
-
-  const previousAttempts = state.toolResults
-    ?.filter((r: any) => r?.error)
-    .map((r: any) => `${r.toolCall?.name}: ${r.error}`)
-    .slice(-5) || [];
+  console.log("[fixErrorsNode] buildErrors:", JSON.stringify(state.buildErrors, null, 2));
+  console.log("[fixErrorsNode] buildOutput:", state.buildOutput?.substring(0, 500));
 
   const fixPlanResult = await intelligentErrorFixer.invoke({
     projectId: state.projectId,
-    errors: state.buildErrors,
+    errors: state.buildErrors || [],
     errorAnalysis: state.errorAnalysis,
-    context: state.context,
-    previousAttempts,
-  });
+    context: {
+      ...state.context,
+      fullBuildError: state.buildOutput || state.error || "",
+    },
+    previousAttempts: [],
+  }) as any;
 
   if (!fixPlanResult.success || !fixPlanResult.fixPlan) {
     sendSSEMessage(state.clientId, {
-      type: "fixing_error",
+      type: "fixing_failed",
       message: "Failed to generate fix plan",
     });
     return {
-      error: fixPlanResult.error || "Failed to generate fix plan",
+      fixAttempts: state.fixAttempts + 1,
     };
   }
 
   sendSSEMessage(state.clientId, {
-    type: "fixing_plan",
-    message: `Generated fix plan with ${fixPlanResult.fixPlan.length} actions`,
-    fixPlan: fixPlanResult.fixPlan,
+    type: "fix_plan_generated",
+    message: `Generated ${fixPlanResult.fixPlan.length} fix actions`,
   });
 
-  const { allTools } = await import("./../../graphs/main");
   const toolMap = allTools.reduce(
-    (acc: Record<string, any>, tool: any) => {
+    (acc, tool) => {
       acc[tool.name] = tool;
       return acc;
     },
-    {},
+    {} as Record<string, any>,
   );
 
-  const fixResults = [];
+  let successCount = 0;
   for (const action of fixPlanResult.fixPlan.slice(0, 10)) {
     try {
       sendSSEMessage(state.clientId, {
         type: "executing_fix",
-        message: `Executing: ${action.description}`,
-        action,
+        message: action.description || `Executing ${action.action}`,
       });
 
       const tool = toolMap[action.action];
       if (!tool) {
-        console.warn(`Tool ${action.action} not found for fix action`);
+        console.warn(`Tool ${action.action} not found in toolMap`);
+        if (action.action === "addDependency" && action.details?.packages) {
+          const addDepTool = toolMap["addDependency"];
+          if (addDepTool) {
+            const result = await addDepTool.invoke({
+              packages: action.details.packages,
+              cwd: action.details.cwd,
+            });
+            if (result.success) successCount++;
+          }
+        } else if (action.action === "executeCommand" && action.details?.command) {
+          const cmdTool = toolMap["executeCommand"];
+          if (cmdTool) {
+            const result = await cmdTool.invoke({
+              command: action.details.command,
+              cwd: action.details.cwd,
+            });
+            if (result.success) successCount++;
+          }
+        } else if (action.action === "replaceInFile" && action.details?.filePath) {
+          const replaceTool = toolMap["replaceInFile"];
+          if (replaceTool) {
+            const result = await replaceTool.invoke({
+              filePath: action.details.filePath,
+              oldString: action.details.oldString,
+              newString: action.details.newString,
+            });
+            if (result.success) successCount++;
+          }
+        }
         continue;
       }
 
+      console.log(`[fixErrorsNode] Invoking tool: ${action.action} with details:`, JSON.stringify(action.details).substring(0, 200));
       const result = await tool.invoke(action.details);
-      fixResults.push({ action, result, success: result.success !== false });
+      console.log(`[fixErrorsNode] Tool ${action.action} result:`, result);
 
-      sendSSEMessage(state.clientId, {
-        type: "fix_completed",
-        message: `Completed: ${action.description}`,
-        success: result.success !== false,
-      });
+      if (result?.success !== false) {
+        successCount++;
+        sendSSEMessage(state.clientId, {
+          type: "fix_success",
+          message: `✓ ${action.description || action.action}`,
+        });
+      } else {
+        console.warn(`[fixErrorsNode] Tool ${action.action} returned success=false:`, result);
+      }
     } catch (error) {
-      console.error(`Error executing fix action ${action.action}:`, error);
-      fixResults.push({
-        action,
-        error: error instanceof Error ? error.message : String(error),
-        success: false,
+      console.error(`[fixErrorsNode] Fix action failed for ${action.action}:`, error);
+      console.error(`[fixErrorsNode] Action details:`, JSON.stringify(action.details, null, 2));
+      sendSSEMessage(state.clientId, {
+        type: "fix_error",
+        message: `✗ ${action.description || action.action}: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
   }
 
-  const successCount = fixResults.filter(r => r.success).length;
   sendSSEMessage(state.clientId, {
     type: "fixing_complete",
-    message: `Applied ${successCount}/${fixResults.length} fixes`,
-    fixResults,
+    message: `Applied ${successCount}/${fixPlanResult.fixPlan.length} fixes successfully`,
   });
 
+  const noFixesGenerated = fixPlanResult.fixPlan.length === 0;
+
+  if (noFixesGenerated) {
+    console.warn("[fixErrorsNode] No fixes were generated by LLM or fallback!");
+    sendSSEMessage(state.clientId, {
+      type: "warning",
+      message: "No fixes could be generated for the errors. The LLM may not know how to fix this issue.",
+    });
+  }
+
   return {
-    toolResults: fixResults,
+    fixAttempts: state.fixAttempts + 1,
+    fixesApplied: !noFixesGenerated,
+    noFixesAvailable: noFixesGenerated && state.fixAttempts >= 2,
   };
 }

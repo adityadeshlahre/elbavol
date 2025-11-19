@@ -180,42 +180,20 @@ export const getContext = tool(
 );
 
 
-export async function getProjectContext(
-  state: WorkflowState,
-): Promise<Partial<WorkflowState>> {
+export async function getContextNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
-    type: "context",
-    message: "Getting project context...",
+    type: "loading_context",
+    message: "Loading project context...",
   });
+
   const result = await getContext.invoke({ projectId: state.projectId });
 
-  let context = result.context;
-
-  try {
-    const fs = await import("fs");
-    const path = await import("path");
-    const sharedDir = process.env.SHARED_DIR || "/app/shared";
-    const contextPath = path.join(sharedDir, `${state.projectId}/context.json`);
-
-    if (fs.existsSync(contextPath)) {
-      const previousContext = JSON.parse(fs.readFileSync(contextPath, "utf8"));
-      context = {
-        ...previousContext,
-        ...context,
-        metadata: {
-          ...previousContext.metadata,
-          ...context.metadata,
-          lastModified: new Date().toISOString(),
-        },
-      };
-      sendSSEMessage(state.clientId, {
-        type: "context",
-        message: "Loaded previous context and merged",
-      });
-    }
-  } catch (error) {
-    console.warn("Failed to load previous context:", error);
+  if (result.context?.baseTemplate?.exists) {
+    sendSSEMessage(state.clientId, {
+      type: "context_loaded",
+      message: `Context loaded: ${result.context.metadata.totalFiles} files`,
+    });
   }
 
-  return { context };
+  return { context: result.context };
 }
