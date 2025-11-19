@@ -17,16 +17,28 @@ export const executeCommand = tool(
     const workingDir = cwd ? path.join(projectDir, cwd) : projectDir;
 
     try {
-      const proc = spawn("sh", ["-c", command], { cwd: workingDir });
+      console.log(`[executeCommand] Running: ${command}`);
+      console.log(`[executeCommand] Working dir: ${workingDir}`);
+
+      let modifiedCommand = command;
+      if (command.includes('bunx --bun shadcn@latest add')) {
+        modifiedCommand = `${command} -y --overwrite`;
+      }
+
+      const proc = spawn(modifiedCommand, [], {
+        cwd: workingDir,
+        shell: true,
+        env: { ...process.env }
+      });
 
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
 
-      proc.stdout.on("data", (d) => stdoutChunks.push(d));
-      proc.stderr.on("data", (d) => stderrChunks.push(d));
+      proc.stdout?.on("data", (d: Buffer) => stdoutChunks.push(d));
+      proc.stderr?.on("data", (d: Buffer) => stderrChunks.push(d));
 
       const exitCode: number = await new Promise((resolve) => {
-        proc.on("close", resolve);
+        proc.on("close", (code) => resolve(code ?? 1));
       });
 
       const stdout = Buffer.concat(stdoutChunks).toString();

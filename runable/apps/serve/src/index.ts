@@ -31,10 +31,20 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({
   groupId: GROUP_ID.SERVING_POD,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
+  retry: {
+    retries: 8,
+  }
 });
 
 export const consumerServeFromControl = kafka.consumer({
   groupId: GROUP_ID.SERVING_TO_CONTROL,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
+  retry: {
+    retries: 8,
+  }
 });
 
 async function connectConsumerServeFromControl() {

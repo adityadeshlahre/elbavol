@@ -46,14 +46,20 @@ export const producer = kafka.producer();
 
 export const consumer = kafka.consumer({
   groupId: GROUP_ID.CONTROL_POD,
-  sessionTimeout: 300000,
-  heartbeatInterval: 10000,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
+  retry: {
+    retries: 8,
+  }
 });
 
 export const consumerControlFromServe = kafka.consumer({
   groupId: GROUP_ID.CONTROL_TO_SERVING,
-  sessionTimeout: 300000,
-  heartbeatInterval: 10000,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
+  retry: {
+    retries: 8,
+  }
 });
 
 async function connectProducer() {
@@ -206,7 +212,8 @@ async function start() {
 
   await consumer.run({
     partitionsConsumedConcurrently: 1,
-    autoCommit: false,
+    // autoCommit: true,
+    // autoCommitInterval: 15000,
     eachMessage: async ({ message, partition, topic }) => {
       console.log(
         `Received message from topic: ${topic}, partition: ${partition}`,
@@ -325,8 +332,6 @@ async function start() {
           }
           break;
       }
-
-      // await consumer.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
     },
   });
 
@@ -336,7 +341,9 @@ async function start() {
   });
 
   await consumerControlFromServe.run({
-    autoCommit: false,
+    partitionsConsumedConcurrently: 1,
+    // autoCommit: true,
+    // autoCommitInterval: 15000,
     eachMessage: async ({ message, partition, topic }) => {
       console.log(
         `Received message from topic: ${topic}, partition: ${partition}`,
@@ -371,8 +378,6 @@ async function start() {
           );
           break;
       }
-
-      // await consumerControlFromServe.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
     },
   });
 
@@ -397,5 +402,3 @@ start().catch((error) => {
   console.error("Error starting Control POD:", error);
   process.exit(1);
 });
-
-startSSEServer();

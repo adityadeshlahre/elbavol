@@ -66,7 +66,8 @@ export const serveTheProject = async (
   const port = 3000;
 
   try {
-    const killProc = spawn("sh", ["-c", `lsof -ti:${port} | xargs kill -9 2>/dev/null || true`]);
+    const killCommand = `lsof -ti:${port} | xargs kill -9 2>/dev/null || true`;
+    const killProc = spawn(killCommand, [], { shell: true });
     await new Promise((resolve) => killProc.on("close", resolve));
     console.log(`Killed existing process on port ${port}`);
   } catch (error) {
@@ -81,12 +82,18 @@ export const serveTheProject = async (
   }
 
   console.log(`Installing dependencies for project ${projectId}`);
-  const installProc = spawn("bun", ["install"], { cwd: dir, stdio: 'pipe' });
+  const installProc = spawn("bun", ["install"], { cwd: dir, stdio: "pipe" });
 
-  installProc.stdout?.on('data', (data) => console.log(`[${projectId}] install:`, data.toString()));
-  installProc.stderr?.on('data', (data) => console.error(`[${projectId}] install error:`, data.toString()));
+  installProc.stdout?.on("data", (data) =>
+    console.log(`[${projectId}] install:`, data.toString()),
+  );
+  installProc.stderr?.on("data", (data) =>
+    console.error(`[${projectId}] install error:`, data.toString()),
+  );
 
-  const installCode: number = await new Promise((resolve) => installProc.on("close", resolve));
+  const installCode: number = await new Promise((resolve) =>
+    installProc.on("close", resolve),
+  );
 
   if (installCode !== 0) {
     console.error(`Failed to install dependencies for ${projectId}`);
@@ -114,26 +121,28 @@ export const serveTheProject = async (
     scriptName = "preview";
   }
 
-  console.log(`Starting server for project ${projectId} on port ${port} with script: ${scriptName}`);
+  console.log(
+    `Starting server for project ${projectId} on port ${port} with script: ${scriptName}`,
+  );
 
   const proc = spawn("bun", ["run", scriptName], {
     cwd: dir,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ["ignore", "pipe", "pipe"],
     detached: false,
     env: { ...process.env, PORT: port.toString() },
   });
 
   runningProcesses.set(projectId, proc);
 
-  proc.stdout?.on('data', (data) => {
+  proc.stdout?.on("data", (data) => {
     console.log(`[${projectId}] stdout:`, data.toString());
   });
 
-  proc.stderr?.on('data', (data) => {
+  proc.stderr?.on("data", (data) => {
     console.error(`[${projectId}] stderr:`, data.toString());
   });
 
-  proc.on('error', (error) => {
+  proc.on("error", (error) => {
     console.error(`[${projectId}] Process error:`, error);
   });
 
@@ -183,7 +192,9 @@ export const serveTheProject = async (
     });
     return true;
   } else {
-    console.error(`Server failed to start on port ${port} for project ${projectId}`);
+    console.error(
+      `Server failed to start on port ${port} for project ${projectId}`,
+    );
     proc.kill();
     runningProcesses.delete(projectId);
 
