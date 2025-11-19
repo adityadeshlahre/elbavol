@@ -1,5 +1,8 @@
 import { sendSSEMessage } from "../../sse";
+import { userGivenPromptCheckerNode } from "../tool/code/userGivenPromptChecker";
 import { analyzeNode } from "../tool/code/smartAnalyzer";
+import { enhancePromptNode } from "../tool/code/enhancePrompt";
+import { planerNode } from "../tool/code/plannerPrompt";
 import { getContextNode } from "../tool/dry/getContext";
 import { validateNode } from "../tool/code/validateBuild";
 import { testBuildNode } from "../tool/dry/testBuild";
@@ -18,6 +21,7 @@ export interface WorkflowState {
     plan?: string;
     toolCalls?: any[];
     context?: any;
+    previousContext?: any;
     toolResults?: any[];
     buildStatus?: "pending" | "success" | "errors" | "tested";
     buildErrors?: any[];
@@ -131,6 +135,13 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
             message: "Starting LangGraph workflow execution",
         });
 
+        const promptCheckResult = await userGivenPromptCheckerNode(state);
+        state = { ...state, ...promptCheckResult };
+
+        if (state.error) {
+            throw new Error(`Prompt validation failed: ${state.error}`);
+        }
+
         const contextResult = await getContextNode(state);
         state = { ...state, ...contextResult };
 
@@ -143,6 +154,20 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
 
         if (state.error) {
             throw new Error(`Failed to analyze: ${state.error}`);
+        }
+
+        const enhanceResult = await enhancePromptNode(state);
+        state = { ...state, ...enhanceResult };
+
+        if (state.error) {
+            throw new Error(`Failed to enhance prompt: ${state.error}`);
+        }
+
+        const planResult = await planerNode(state);
+        state = { ...state, ...planResult };
+
+        if (state.error) {
+            throw new Error(`Failed to create plan: ${state.error}`);
         }
 
         while (!state.completed && !state.error) {
@@ -190,11 +215,6 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
                     type: "error",
                     message: state.error,
                 });
-                break;
-            }
-
-            if (state.fixAttempts > 20) {
-                state.error = "Maximum fix attempts (20) reached";
                 break;
             }
         }

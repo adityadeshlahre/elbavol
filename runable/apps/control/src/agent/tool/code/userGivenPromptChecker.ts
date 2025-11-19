@@ -2,6 +2,8 @@ import { tool } from "langchain";
 import * as z from "zod";
 import { model } from "@/agent/client";
 import { SYSTEM_PROMPTS } from "@/prompt";
+import { sendSSEMessage } from "@/sse";
+import type { WorkflowState } from "@/agent/graphs/workflow";
 
 const userGivenPromptSchema = z.string().min(1).max(256);
 
@@ -40,3 +42,43 @@ export const checkUserGivenPrompt = tool(
     schema: userGivenPromptSchema,
   },
 );
+
+export async function userGivenPromptCheckerNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
+  sendSSEMessage(state.clientId, {
+    type: "checking_prompt",
+    message: "Checking prompt for safety and security...",
+  });
+
+  const result = await checkUserGivenPrompt.invoke(state.prompt);
+
+  if (!result.success) {
+    sendSSEMessage(state.clientId, {
+      type: "prompt_check_failed",
+      message: "Prompt validation failed",
+      error: result.error,
+    });
+    return {
+      error: result.error || "Prompt validation failed",
+    };
+  }
+
+  const validation = result.message;
+
+  if (!validation.isSafe) {
+    sendSSEMessage(state.clientId, {
+      type: "prompt_unsafe",
+      message: "Prompt contains unsafe or malicious content",
+      reason: validation.reason,
+    });
+    return {
+      error: `Unsafe prompt: ${validation.reason}`,
+    };
+  }
+
+  sendSSEMessage(state.clientId, {
+    type: "prompt_check_passed",
+    message: "Prompt validation passed successfully",
+  });
+
+  return {};
+}

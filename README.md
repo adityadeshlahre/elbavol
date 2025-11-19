@@ -10,39 +10,45 @@
 START
   │
   ▼
-analyze
+check_prompt (userGivenPromptCheckerNode: validate prompt safety)
   │
-  ├─needsEnhancement?──► enhance ──┐
-  │                               │
-  └───────────────► plan ────────┘
-                    │
-                    ▼
-               get_context
-                    │
-                    ▼
-                 execute
-                 (tools run in parallel with SSE updates)
-                    │
-                    ▼
-                validate
-                    │
-          ┌─────────┼─────────┐
-          │         │         │
-    buildStatus     │         |
-    === "success"   │         │
-          │         │         │
-          ▼         ▼         ▼
-      test_build    execute    END
-          │
-          ├─buildStatus === "tested"?──► push ──► save ──► run ──► END
-          │
-          └───────────────► fix_errors ──┐
-                                        │
-                                        ▼
-                                   test_build
+  ▼
+get_context (read existing project files)
+  │
+  ▼
+analyze (smartAnalyzer: analyze intent, complexity)
+  │
+  ▼
+enhance (enhancePromptNode: enhance prompt with LLM)
+  │
+  ▼
+plan (planerNode: create detailed execution plan)
+  │
+  ▼
+execute (run tool calls in parallel with SSE updates)
+  │
+  ▼
+validate (check build status)
+  │
+  ├─buildStatus === "success"?
+  │   │
+  │   ▼
+  │ test_build
+  │   │
+  │   ├─buildStatus === "tested"?──► push ──► save ──► run ──► END
+  │   │
+  │   └─errors?──► fix_errors ──┐
+  │                             │
+  └─buildStatus === "errors"?   │
+      │                         │
+      ▼                         │
+   fix_errors ──────────────────┘
+      │
+      └──► execute (re-run tools with fixes)
 ```
 
 **Tool Execution Details:**
+
 - Tools execute directly (no toolExecutor wrapper)
 - Parallel execution for independent operations
 - Real-time SSE updates for each tool:
@@ -59,4 +65,3 @@ analyze
 - test the workflow local
 - serving the diffs to frontend
 - operating using k8s programatiaclly
- 

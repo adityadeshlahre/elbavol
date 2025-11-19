@@ -51,24 +51,19 @@ export const enhancePrompt = tool(
 export async function enhancePromptNode(
   state: WorkflowState,
 ): Promise<Partial<WorkflowState>> {
-  let enhanced = state.prompt;
-  if (state.analysis?.needsEnhancement) {
-    sendSSEMessage(state.clientId, {
-      type: "enhancing",
-      message: "Enhancing prompt...",
-    });
-    const result = await enhancePrompt.invoke({
-      prompt: state.prompt,
-      contextInfo: JSON.stringify(state.analysis),
-    });
-    enhanced = result.success
-      ? result.enhancedPrompt || state.prompt
-      : state.prompt;
-    if (result.success && result.enhancedPrompt) {
-      return {
-        enhancedPrompt: enhanced,
-      };
-    }
-  }
+  sendSSEMessage(state.clientId, {
+    type: "enhancing",
+    message: "Enhancing prompt...",
+  });
+
+  const result = await enhancePrompt.invoke({
+    prompt: state.prompt,
+    contextInfo: JSON.stringify(state.analysis),
+  });
+
+  const enhanced = result.success
+    ? result.enhancedPrompt || state.prompt
+    : state.prompt;
+
   return { enhancedPrompt: enhanced };
 }

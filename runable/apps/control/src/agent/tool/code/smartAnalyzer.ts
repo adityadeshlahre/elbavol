@@ -55,41 +55,31 @@ YOUR WORKFLOW - FOLLOW THIS STRICTLY:
 4. MODIFY: Use updateFile for existing files, createFile ONLY for new files
 5. DO NOT: Create new project, reinstall existing packages, or ignore existing structure
 
+OPTIMIZATION & STRUCTURE RULES:
+1. **Distributed Components**: Break down large components into smaller, reusable sub-components.
+2. **Better Folder Structure**:
+   - \`src/features/\`: For domain-specific features (e.g., \`src/features/auth\`, \`src/features/dashboard\`)
+   - \`src/layouts/\`: For page layouts (e.g., \`src/layouts/MainLayout.jsx\`)
+   - \`src/pages/\`: For route components
+   - \`src/hooks/\`: For custom hooks
+   - \`src/utils/\`: For helper functions
+3. **Token Usage**: Be concise in your plans. Do not output unnecessary text.
+4. **Batch Operations**: Use \`writeMultipleFile\` when creating multiple files to reduce tool call overhead.
+
 Your task is to:
-1. Analyze the prompt intent and complexity
-2. Enhance the prompt if it's vague or needs clarification
-3. Create a detailed, step-by-step execution plan that WORKS WITH the existing template
-4. Generate specific tool calls that MODIFY the existing project
+1. Analyze the prompt intent (creation, modification, debugging, etc.)
+2. Assess complexity level (low, medium, high)
+3. Identify required tools for this task
+4. Estimate number of steps needed
 
 Return a JSON object with this exact structure:
 {
   "analysis": {
     "intent": "creation|modification|debugging|validation|general",
     "complexity": "low|medium|high",
-    "needsEnhancement": false,
     "requiredTools": ["tool1", "tool2"],
     "estimatedSteps": 5
-  },
-  "enhancedPrompt": "enhanced version of the prompt",
-  "plan": "detailed step-by-step plan that works with existing template",
-  "toolCalls": [
-    {
-      "tool": "listDir",
-      "args": { "directory": "." }
-    },
-    {
-      "tool": "readFile",
-      "args": { "filePath": "package.json" }
-    },
-    {
-      "tool": "readFile",
-      "args": { "filePath": "src/App.jsx" }
-    },
-    {
-      "tool": "updateFile",
-      "args": { "filePath": "src/App.jsx", "content": "modified React component code" }
-    }
-  ]
+  }
 }
 
 Available tools and their arguments:
@@ -168,76 +158,37 @@ Remember:
             try {
                 const text = response.text.trim();
 
-                // Try to extract JSON from markdown code blocks first
                 let jsonText = text;
                 const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
                 if (codeBlockMatch && codeBlockMatch[1]) {
                     jsonText = codeBlockMatch[1];
                 } else {
-                    // Try to find JSON object in the response
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
                         jsonText = jsonMatch[0];
                     }
                 }
 
-                // Clean up common JSON issues
                 jsonText = jsonText
-                    .replace(/,(\s*[\]}])/g, '$1') // Remove trailing commas
-                    .replace(/\r/g, '')             // Remove carriage returns
+                    .replace(/,(\s*[\]}])/g, '$1')
+                    .replace(/\r/g, '')
                     .trim();
 
                 result = JSON.parse(jsonText);
 
-                // Validate result has required fields
-                if (!result.analysis || !result.plan) {
-                    throw new Error("Missing required fields in response");
-                }
-
-                // Ensure toolCalls exists, default to empty array
-                if (!result.toolCalls) {
-                    result.toolCalls = [];
+                if (!result.analysis) {
+                    throw new Error("Missing analysis field in response");
                 }
 
             } catch (parseError) {
                 console.error("Failed to parse AI response:", parseError);
                 console.error("AI response text:", response.text.substring(0, 500));
-
-                // Fallback: Create a basic plan that reads existing template
-                result = {
-                    analysis: {
-                        intent: "modification",
-                        complexity: "medium",
-                        needsEnhancement: false,
-                        requiredTools: ["listDir", "readFile", "updateFile"],
-                        estimatedSteps: 6
-                    },
-                    enhancedPrompt: prompt,
-                    plan: `Based on the prompt: "${prompt}", modify the existing React template with the following steps:
-1. List existing project structure to understand what's there
-2. Read package.json to see installed dependencies
-3. Read src/App.jsx to understand current app structure
-4. Read other relevant files as needed
-5. Modify/create components based on existing structure
-6. Test the build`,
-                    toolCalls: [
-                        { tool: "listDir", args: { directory: "." } },
-                        { tool: "listDir", args: { directory: "src" } },
-                        { tool: "listDir", args: { directory: "src/components" } }, ,
-                        { tool: "listDir", args: { directory: "src/components/ui" } },
-                        { tool: "readFile", args: { filePath: "package.json" } },
-                        { tool: "readFile", args: { filePath: "src/App.jsx" } },
-                        { tool: "readFile", args: { filePath: "src/index.css" } }
-                    ]
-                };
+                throw new Error("Failed to analyze prompt: Invalid LLM response");
             }
 
             return {
                 success: true,
                 analysis: result.analysis,
-                enhancedPrompt: result.enhancedPrompt || prompt,
-                plan: result.plan,
-                toolCalls: result.toolCalls || [],
             };
         } catch (error) {
             console.error("Error in smartAnalyzeAndPlan:", error);
@@ -258,7 +209,7 @@ Remember:
 export async function analyzeNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
     sendSSEMessage(state.clientId, {
         type: "analyzing",
-        message: "Analyzing prompt and creating execution plan...",
+        message: "Analyzing prompt intent and complexity...",
     });
 
     const result = await smartAnalyzeAndPlan.invoke({
@@ -270,26 +221,23 @@ export async function analyzeNode(state: WorkflowState): Promise<Partial<Workflo
     if (!result.success) {
         sendSSEMessage(state.clientId, {
             type: "analysis_failed",
-            message: "Failed to analyze and plan",
+            message: "Failed to analyze prompt",
             error: result.error,
         });
 
         return {
             error: result.error || "Analysis failed",
-            analysis: { needsEnhancement: false, intent: "general" },
+            analysis: { intent: "general", complexity: "medium", requiredTools: [], estimatedSteps: 5 },
         };
     }
 
     sendSSEMessage(state.clientId, {
         type: "analysis_complete",
-        message: `Analysis complete: ${result.analysis.intent}`,
+        message: `Analysis complete: ${result.analysis.intent} (${result.analysis.complexity} complexity)`,
         analysis: result.analysis,
     });
 
     return {
         analysis: result.analysis,
-        enhancedPrompt: result.enhancedPrompt,
-        plan: result.plan,
-        toolCalls: result.toolCalls,
     };
 };

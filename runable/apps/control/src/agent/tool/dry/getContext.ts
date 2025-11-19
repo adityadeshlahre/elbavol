@@ -35,7 +35,11 @@ const IGNORE_PATTERNS = [
   '.pnp',
   '.pnp.js',
   '*.local',
-  'bun.lockb'
+  'bun.lockb',
+  ".next",
+  "next",
+  ".nx",
+  "nx",
 ];
 
 function shouldIgnoreFile(filePath: string): boolean {
@@ -52,11 +56,12 @@ function shouldIgnoreFile(filePath: string): boolean {
 
 const getContextInput = z.object({
   projectId: z.string(),
+  previousContext: z.any().optional(),
 });
 
 export const getContext = tool(
   async (input: z.infer<typeof getContextInput>) => {
-    const { projectId } = getContextInput.parse(input);
+    const { projectId, previousContext } = getContextInput.parse(input);
     const sharedDir = process.env.SHARED_DIR || "/app/shared";
     const projectDir = path.join(sharedDir, projectId);
 
@@ -89,12 +94,22 @@ export const getContext = tool(
       fileStructure: {},
       dependencies: [],
       currentFiles: {},
+      fileLastModified: {},
       metadata: {
         lastModified: new Date().toISOString(),
         totalFiles: 0,
         buildStatus: "pending",
       },
     };
+
+    if (previousContext) {
+      context.currentFiles = { ...previousContext.currentFiles };
+      context.fileLastModified = { ...previousContext.fileLastModified };
+      context.dependencies = [...(previousContext.dependencies || [])];
+      context.devDependencies = [...(previousContext.devDependencies || [])];
+      context.scripts = { ...previousContext.scripts };
+      context.baseTemplate = { ...previousContext.baseTemplate };
+    }
 
     try {
       if (fs.existsSync(projectDir)) {
@@ -123,25 +138,26 @@ export const getContext = tool(
           "components.json"
         ];
 
-        const MAX_FILE_SIZE = 50 * 1024;
-
         for (const file of keyFiles) {
           const filePath = path.join(projectDir, file);
           if (fs.existsSync(filePath)) {
             const stats = fs.statSync(filePath);
+            const mtime = stats.mtimeMs;
 
-            if (stats.size > MAX_FILE_SIZE) {
-              context.currentFiles[file] = `[File too large: ${(stats.size / 1024).toFixed(2)}KB]`;
+            if (file !== "package.json" &&
+              context.currentFiles[file] &&
+              context.fileLastModified?.[file] === mtime) {
               continue;
             }
 
             const content = fs.readFileSync(filePath, "utf8");
-
             if (content.length > 10000) {
               context.currentFiles[file] = content.slice(0, 10000) + "\n\n... [truncated]";
             } else {
               context.currentFiles[file] = content;
             }
+
+            context.fileLastModified[file] = mtime;
           }
         }
 
@@ -153,7 +169,6 @@ export const getContext = tool(
           context.baseTemplate.installedComponents = uiComponents;
         }
 
-        // Get dependencies from package.json
         const packagePath = path.join(projectDir, "package.json");
         if (fs.existsSync(packagePath)) {
           const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
@@ -174,7 +189,7 @@ export const getContext = tool(
   {
     name: "getContext",
     description:
-      "Retrieves project context including file structure, dependencies, and key files.",
+      "Retrieves project context including file structure, dependencies, and key files. Can optionally accept previousContext to avoid re-reading unchanged files.",
     schema: getContextInput,
   },
 );
@@ -186,7 +201,10 @@ export async function getContextNode(state: WorkflowState): Promise<Partial<Work
     message: "Loading project context...",
   });
 
-  const result = await getContext.invoke({ projectId: state.projectId });
+  const result = await getContext.invoke({
+    projectId: state.projectId,
+    previousContext: state.context
+  });
 
   if (result.context?.baseTemplate?.exists) {
     sendSSEMessage(state.clientId, {

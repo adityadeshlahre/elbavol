@@ -49,18 +49,58 @@ export const plannerPromptTool = tool(
 );
 
 
-export async function planChanges(state: WorkflowState): Promise<Partial<WorkflowState>> {
+export async function planerNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "planning",
-    message: "Planning changes...",
+    message: "Creating detailed execution plan with tool calls...",
   });
+
   const promptToUse = state.enhancedPrompt || state.prompt;
+  const analysisInfo = state.analysis ? `\n\nAnalysis: Intent=${state.analysis.intent}, Complexity=${state.analysis.complexity}` : '';
+
   const result = await plannerPromptTool.invoke({
-    prompt: promptToUse,
-    contextInfo: JSON.stringify(state.context),
+    prompt: promptToUse + analysisInfo,
+    contextInfo: JSON.stringify({
+      context: state.context,
+      analysis: state.analysis,
+    }),
   });
-  const plan = result.success ? result.plan : "Default plan";
+
+  if (!result.success) {
+    sendSSEMessage(state.clientId, {
+      type: "planning_failed",
+      message: "Failed to create plan",
+      error: result.error,
+    });
+    return {
+      error: result.error || "Planning failed",
+    };
+  }
+
+  const toolCalls = generateToolCallsFromPlan(result.plan || "");
+
+  sendSSEMessage(state.clientId, {
+    type: "planning_complete",
+    message: `Plan created with ${toolCalls.length} tool calls`,
+  });
+
   return {
-    plan: plan,
+    plan: result.plan,
+    toolCalls: toolCalls,
   };
+}
+
+function generateToolCallsFromPlan(_plan: string): any[] {
+  const toolCalls: any[] = [];
+
+  toolCalls.push({ tool: "listDir", args: { directory: "." } });
+  toolCalls.push({ tool: "listDir", args: { directory: "src" } });
+  toolCalls.push({ tool: "listDir", args: { directory: "src/components" } });
+  toolCalls.push({ tool: "listDir", args: { directory: "src/components/" } });
+  toolCalls.push({ tool: "listDir", args: { directory: "src/components/ui" } });
+  toolCalls.push({ tool: "readFile", args: { filePath: "package.json" } });
+  toolCalls.push({ tool: "readFile", args: { filePath: "src/App.jsx" } });
+  toolCalls.push({ tool: "readFile", args: { filePath: "src/index.css" } });
+
+  return toolCalls;
 }

@@ -23,9 +23,6 @@ export const promptAnalyzer = tool(
       estimatedTime: estimateCompletionTime(prompt),
       projectId,
       context: context || {},
-      needsEnhancement:
-        assessComplexity(prompt) === "high" ||
-        analyzeIntent(prompt) === "debugging",
     };
 
     return {
