@@ -58,12 +58,15 @@ export async function planerNode(state: WorkflowState): Promise<Partial<Workflow
   const promptToUse = state.enhancedPrompt || state.prompt;
   const analysisInfo = state.analysis ? `\n\nAnalysis: Intent=${state.analysis.intent}, Complexity=${state.analysis.complexity}` : '';
 
+  const contextInfo = JSON.stringify({
+    context: state.context,
+    analysis: state.analysis,
+    existingFiles: state.context?.currentFiles || {},
+  });
+
   const result = await plannerPromptTool.invoke({
     prompt: promptToUse + analysisInfo,
-    contextInfo: JSON.stringify({
-      context: state.context,
-      analysis: state.analysis,
-    }),
+    contextInfo: contextInfo,
   });
 
   if (!result.success) {
@@ -77,7 +80,87 @@ export async function planerNode(state: WorkflowState): Promise<Partial<Workflow
     };
   }
 
-  const toolCalls = generateToolCallsFromPlan(result.plan || "");
+  let parsedPlan;
+  let toolCalls;
+
+  try {
+    const text = (result.plan || "").trim();
+
+    let jsonText = text;
+    const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      jsonText = codeBlockMatch[1];
+    } else {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[0];
+      }
+    }
+
+    jsonText = jsonText
+      .replace(/,(\s*[\]}])/g, '$1')
+      .replace(/\r/g, '')
+      .trim();
+
+    parsedPlan = JSON.parse(jsonText);
+    toolCalls = parsedPlan.toolCalls || [];
+
+    if (toolCalls.length === 0) {
+      throw new Error("No tool calls generated in plan");
+    }
+
+  } catch (parseError) {
+    console.error("Failed to parse plan JSON:", parseError);
+    console.error("Plan text:", (result.plan || "").substring(0, 500));
+
+    sendSSEMessage(state.clientId, {
+      type: "planning_retry",
+      message: "Invalid plan format, retrying with stricter instructions...",
+    });
+
+    const retryResult = await plannerPromptTool.invoke({
+      prompt: `${promptToUse + analysisInfo}\n\nIMPORTANT: You MUST return ONLY a valid JSON object with this exact structure:\n{\n  "plan": "description",\n  "toolCalls": [{"tool": "toolName", "args": {...}}]\n}\nDo NOT use markdown code blocks. Do NOT add any text outside the JSON. Return ONLY the JSON object.`,
+      contextInfo: contextInfo,
+    });
+
+    if (!retryResult.success) {
+      return {
+        error: "Failed to generate valid plan after retry",
+      };
+    }
+
+    try {
+      const retryText = (retryResult.plan || "").trim();
+      let retryJsonText = retryText;
+
+      const retryCodeBlockMatch = retryText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (retryCodeBlockMatch && retryCodeBlockMatch[1]) {
+        retryJsonText = retryCodeBlockMatch[1];
+      } else {
+        const retryJsonMatch = retryText.match(/\{[\s\S]*\}/);
+        if (retryJsonMatch) {
+          retryJsonText = retryJsonMatch[0];
+        }
+      }
+
+      retryJsonText = retryJsonText
+        .replace(/,(\s*[\]}])/g, '$1')
+        .replace(/\r/g, '')
+        .trim();
+
+      parsedPlan = JSON.parse(retryJsonText);
+      toolCalls = parsedPlan.toolCalls || [];
+
+      if (toolCalls.length === 0) {
+        throw new Error("No tool calls in retry");
+      }
+    } catch (retryError) {
+      console.error("Retry also failed:", retryError);
+      return {
+        error: "Unable to generate valid execution plan with tool calls",
+      };
+    }
+  }
 
   sendSSEMessage(state.clientId, {
     type: "planning_complete",
@@ -85,22 +168,7 @@ export async function planerNode(state: WorkflowState): Promise<Partial<Workflow
   });
 
   return {
-    plan: result.plan,
+    plan: parsedPlan.plan || result.plan,
     toolCalls: toolCalls,
   };
-}
-
-function generateToolCallsFromPlan(_plan: string): any[] {
-  const toolCalls: any[] = [];
-
-  toolCalls.push({ tool: "listDir", args: { directory: "." } });
-  toolCalls.push({ tool: "listDir", args: { directory: "src" } });
-  toolCalls.push({ tool: "listDir", args: { directory: "src/components" } });
-  toolCalls.push({ tool: "listDir", args: { directory: "src/components/" } });
-  toolCalls.push({ tool: "listDir", args: { directory: "src/components/ui" } });
-  toolCalls.push({ tool: "readFile", args: { filePath: "package.json" } });
-  toolCalls.push({ tool: "readFile", args: { filePath: "src/App.jsx" } });
-  toolCalls.push({ tool: "readFile", args: { filePath: "src/index.css" } });
-
-  return toolCalls;
 }

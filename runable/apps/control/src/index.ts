@@ -326,7 +326,7 @@ async function start() {
           break;
       }
 
-      await consumer.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
+      // await consumer.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
     },
   });
 
@@ -338,6 +338,10 @@ async function start() {
   await consumerControlFromServe.run({
     autoCommit: false,
     eachMessage: async ({ message, partition, topic }) => {
+      console.log(
+        `Received message from topic: ${topic}, partition: ${partition}`,
+        JSON.stringify(message),
+      );
       const projectId = message.key?.toString();
       const value = message.value?.toString();
       if (!value) return;
@@ -368,7 +372,7 @@ async function start() {
           break;
       }
 
-      await consumerControlFromServe.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
+      // await consumerControlFromServe.commitOffsets([{ topic, partition, offset: (message.offset + 1).toString() }]);
     },
   });
 

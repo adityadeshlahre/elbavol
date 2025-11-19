@@ -4,6 +4,7 @@ import { model } from "@/agent/client";
 import { sendSSEMessage } from "@/sse";
 import type { WorkflowState } from "@/agent/graphs/workflow";
 import { allTools } from "@/agent/graphs/main";
+import { IGNORE_PATTERNS } from "../dry/getContext";
 
 const errorFixerInput = z.object({
   projectId: z.string(),
@@ -13,8 +14,30 @@ const errorFixerInput = z.object({
   previousAttempts: z.array(z.string()).optional(),
 });
 
-function createFallbackFixPlan(errors: any[], _errorAnalysis: any, fullBuildError?: string): any[] {
+function createFallbackFixPlan(errors: any[], _errorAnalysis: any, fullBuildError?: string, existingFiles?: string[]): any[] {
   const fixPlan: any[] = [];
+
+  if (fullBuildError && fullBuildError.includes("Cannot apply unknown utility class")) {
+    console.log("[createFallbackFixPlan] Detected Tailwind CSS error - unknown utility class");
+    const componentFiles = existingFiles?.filter(f =>
+      (f.endsWith('.jsx') || f.endsWith('.tsx') || f.endsWith('.js')) &&
+      f.includes('src/')
+    ) || [];
+
+    console.log("[createFallbackFixPlan] Will search these component files:", componentFiles.slice(0, 10));
+
+    for (const file of componentFiles.slice(0, 5)) {
+      fixPlan.push({
+        priority: 1,
+        action: "readFile",
+        target: file,
+        description: `Check ${file} for empty className attributes`,
+        details: {
+          filePath: file
+        }
+      });
+    }
+  }
 
   const allMissingPackages = new Set<string>();
 
@@ -219,38 +242,83 @@ ${previousAttempts.map((attempt, idx) => `${idx + 1}. ${attempt}`).join('\n')}
 Project Context:
 - Available dependencies: ${context?.dependencies?.join(', ') || 'unknown'}
 - React version: ${context?.dependencies?.includes('react') ? 'installed' : 'check package.json'}
+${context?.existingFiles ? `
+- Existing files in project (${context.existingFiles.length} files):
+  ${context.existingFiles.slice(0, 50).join('\n  ')}
+` : ''}
 `;
 
     const systemPrompt = `You are an expert JavaScript/React error fixer. Analyze the FULL BUILD ERROR OUTPUT carefully to extract exact package names and create fixes.
 
 CRITICAL INSTRUCTIONS:
-1. Read the FULL BUILD ERROR OUTPUT section to find the EXACT package/module names
-2. For Vite/Rollup errors like "failed to resolve import '@radix-ui/react-label'":
+1. **TAILWIND CSS ERRORS** (HIGHEST PRIORITY):
+   - Error: "Cannot apply unknown utility class \`\`" (empty class)
+   - The error points to src/index.css or src/App.css but the REAL problem is in JSX components
+   - ROOT CAUSE: A component has empty className="" or className={undefined} or className={''}
+   - SOLUTION: Use executeCommand with: grep -r "className=\"\"" src/ to find the culprit file
+   - Then use replaceInFile to remove the empty className attribute entirely
+   - IMPORTANT: The error says "file: /path/to/src/index.css" but DON'T fix index.css - fix the component!
+
+2. **FILE EXISTENCE CHECK**:
+   - BEFORE suggesting fixes for a file, CHECK if it exists in the "Existing files in project" list
+   - If file doesn't exist (like src/components/ServicesSection.jsx), DO NOT create fixes for it
+   - Only fix files that actually exist in the project
+
+3. Read the FULL BUILD ERROR OUTPUT section to find the EXACT package/module names
+4. For Vite/Rollup errors like "failed to resolve import '@radix-ui/react-label'":
    - Extract the EXACT package name from the error (e.g., @radix-ui/react-label)
    - Create an addDependency action with that exact package name
-3. For missing exports like '"Tools" is not exported by "lucide-react"':
+5. For missing exports like '"Tools" is not exported by "lucide-react"':
    - This means the import name is WRONG, not missing
    - For lucide-react, common icons are: Tool (singular), Wrench, Hammer, Settings, Cog, HardHat
    - Use replaceInFile action to fix the import statement
    - Use replaceInFile action again to fix JSX usage
-4. Always prioritize addDependency for missing modules over other fixes
+6. Always prioritize: Tailwind errors > addDependency for missing modules > import fixes
 
 Fix Action Types:
-- addDependency: { packages: ["exact-package-name"] } - For missing npm packages
-- replaceInFile: { filePath, oldString, newString } - For find-and-replace in files (fixing imports, renaming)
-- updateFile: { filePath, content } - For replacing entire file content
-- createFile: { filePath, content } - For creating missing files
-- executeCommand: { command } - For running shell commands
+- executeCommand: { command, cwd? } - Run shell commands (grep, sed, etc.) - Use for searching files
+- addDependency: { packages: ["exact-package-name"], cwd? } - Install npm packages
+- replaceInFile: { filePath, oldString, newString } - Find-and-replace in specific file
+- updateFile: { filePath, content } - Replace entire file content
+- createFile: { filePath, content } - Create new files
 
-RESPONSE FORMAT (return ONLY this JSON, no markdown, no backticks):
+EXAMPLES:
+
+Example 1: Tailwind CSS empty class error
+[
+  {
+    "priority": 1,
+    "action": "executeCommand",
+    "target": "Find empty className",
+    "description": "Search for empty className attributes in components",
+    "details": {
+      "command": "grep -n 'className=\"\"' src/*.jsx src/**/*.jsx 2>/dev/null || echo 'Not found'"
+    }
+  }
+]
+
+Example 2: Missing package error
+[
+  {
+    "priority": 1,
+    "action": "addDependency",
+    "target": "@radix-ui/react-label",
+    "description": "Install missing dependency @radix-ui/react-label",
+    "details": {
+      "packages": ["@radix-ui/react-label"]
+    }
+  }
+]
+
+Example 3: Wrong import name (ONLY if file exists in project)
 [
   {
     "priority": 1,
     "action": "replaceInFile",
-    "target": "src/components/ServicesSection.jsx",
+    "target": "src/App.jsx",
     "description": "Fix invalid lucide-react import: Tools -> Tool",
     "details": {
-      "filePath": "src/components/ServicesSection.jsx",
+      "filePath": "src/App.jsx",
       "oldString": "import { Construction, Building, Tools } from 'lucide-react';",
       "newString": "import { Construction, Building, Tool } from 'lucide-react';"
     }
@@ -258,10 +326,10 @@ RESPONSE FORMAT (return ONLY this JSON, no markdown, no backticks):
   {
     "priority": 2,
     "action": "replaceInFile",
-    "target": "src/components/ServicesSection.jsx",
+    "target": "src/App.jsx",
     "description": "Update JSX to use Tool instead of Tools",
     "details": {
-      "filePath": "src/components/ServicesSection.jsx",
+      "filePath": "src/App.jsx",
       "oldString": "<Tools",
       "newString": "<Tool"
     }
@@ -322,7 +390,7 @@ CRITICAL: Return ONLY the JSON array. NO markdown code blocks, NO explanations, 
 
         // Fallback: Create a simple fix plan based on error types
         console.log("Creating fallback fix plan...");
-        fixPlan = createFallbackFixPlan(normalizedErrors, errorAnalysis, fullBuildError);
+        fixPlan = createFallbackFixPlan(normalizedErrors, errorAnalysis, fullBuildError, context?.existingFiles);
 
         if (fixPlan.length === 0) {
           return {
@@ -354,6 +422,34 @@ CRITICAL: Return ONLY the JSON array. NO markdown code blocks, NO explanations, 
   },
 );
 
+function getAllProjectFiles(projectDir: string, baseDir: string = "",): string[] {
+  const fs = require("fs");
+  const path = require("path");
+  const files: string[] = [];
+
+  try {
+    const entries = fs.readdirSync(path.join(projectDir, baseDir), { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (IGNORE_PATTERNS.some(pattern => entry.name.includes(pattern) || entry.name.startsWith(pattern))) {
+        continue;
+      }
+
+      const relativePath = baseDir ? `${baseDir}/${entry.name}` : entry.name;
+
+      if (entry.isDirectory()) {
+        files.push(...getAllProjectFiles(projectDir, relativePath));
+      } else if (entry.isFile()) {
+        files.push(relativePath);
+      }
+    }
+  } catch (error) {
+    console.error(`[getAllProjectFiles] Error reading ${baseDir}:`, error);
+  }
+
+  return files;
+}
+
 export async function fixErrorsNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
   sendSSEMessage(state.clientId, {
     type: "fixing",
@@ -363,6 +459,13 @@ export async function fixErrorsNode(state: WorkflowState): Promise<Partial<Workf
   console.log("[fixErrorsNode] buildErrors:", JSON.stringify(state.buildErrors, null, 2));
   console.log("[fixErrorsNode] buildOutput:", state.buildOutput?.substring(0, 500));
 
+  const projectId = state.projectId;
+  const sharedDir = process.env.SHARED_DIR || "/app/shared";
+  const projectDir = require("path").join(sharedDir, projectId);
+  const existingFiles = getAllProjectFiles(projectDir);
+
+  console.log("[fixErrorsNode] Found existing files:", existingFiles.slice(0, 20));
+
   const fixPlanResult = await intelligentErrorFixer.invoke({
     projectId: state.projectId,
     errors: state.buildErrors || [],
@@ -370,6 +473,7 @@ export async function fixErrorsNode(state: WorkflowState): Promise<Partial<Workf
     context: {
       ...state.context,
       fullBuildError: state.buildOutput || state.error || "",
+      existingFiles: existingFiles,
     },
     previousAttempts: [],
   }) as any;

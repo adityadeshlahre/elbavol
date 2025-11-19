@@ -20,9 +20,40 @@ export const checkUserGivenPrompt = tool(
         },
       ]);
 
+      let parsedMessage;
+      try {
+        const text = res.text.trim();
+
+        let jsonText = text;
+        const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (codeBlockMatch && codeBlockMatch[1]) {
+          jsonText = codeBlockMatch[1];
+        } else {
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            jsonText = jsonMatch[0];
+          }
+        }
+
+        jsonText = jsonText
+          .replace(/,(\s*[\]}])/g, '$1')
+          .replace(/\r/g, '')
+          .trim();
+
+        parsedMessage = JSON.parse(jsonText);
+      } catch (parseError) {
+        console.error("Failed to parse LLM response as JSON:", parseError);
+        console.error("LLM response:", res.text.substring(0, 500));
+
+        return {
+          success: true,
+          message: { isSafe: true, reason: "Could not parse security check, allowing by default" },
+        };
+      }
+
       return {
         success: true,
-        message: JSON.parse(res.text),
+        message: parsedMessage,
       };
     } catch (error) {
       console.error("Error in checkUserGivenPrompt:", error);

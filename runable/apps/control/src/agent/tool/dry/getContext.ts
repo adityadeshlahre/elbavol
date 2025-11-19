@@ -5,7 +5,7 @@ import { tool } from "langchain";
 import path from "path";
 import * as z from "zod";
 
-const IGNORE_PATTERNS = [
+export const IGNORE_PATTERNS = [
   'node_modules',
   '.turbo',
   'dist',
