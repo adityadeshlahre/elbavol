@@ -101,12 +101,13 @@ CRITICAL IMPORT/EXPORT VALIDATION:
 - Create component variants for different states using the design system
 
 ### Beautiful UI Requirements:
-- Use gradients: bg-gradient-to-r from-blue-500 to-purple-600
+- Use gradients: bg-gradient-to-r from-{random-color}-500 to-{random-color}-600
 - Add shadows: shadow-2xl, shadow-glow
 - Include animations: animate-pulse, hover:scale-105, transition-smooth
 - Use hover effects for interactive elements
 - Implement modern spacing and typography
 - Create responsive designs that work on all devices
+- Create a full expended page do not restricte the body size
 
 Example Design Tokens (index.css):
 \`\`\`css
