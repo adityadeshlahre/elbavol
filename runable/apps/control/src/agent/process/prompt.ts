@@ -72,20 +72,20 @@ export async function processPrompt(
 
       console.log(`Agent completed successfully for project ${projectId}`);
 
-      if (finalState.context?.metadata?.buildStatus === "success") {
-        await producer.send({
-          topic: TOPIC.CONTROL_TO_SERVING,
-          messages: [
-            {
-              key: projectId,
-              value: JSON.stringify({
-                key: MESSAGE_KEYS.PROJECT_RUN,
-                projectId,
-              }),
-            },
-          ],
-        });
-      }
+      // if (finalState.context?.metadata?.buildStatus === "success") {
+      //   await producer.send({
+      //     topic: TOPIC.CONTROL_TO_SERVING,
+      //     messages: [
+      //       {
+      //         key: projectId,
+      //         value: JSON.stringify({
+      //           key: MESSAGE_KEYS.PROJECT_RUN,
+      //           projectId,
+      //         }),
+      //       },
+      //     ],
+      //   });
+      // }
     } else {
       sendSSEMessage(clientIdUsed, {
         type: "error",

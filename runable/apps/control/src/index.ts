@@ -33,7 +33,26 @@ export const processing = new Map<
   (value: { success: boolean; payload?: string }) => void
 >();
 
-const promptProcessing = new Set<string>();
+const processedMessages = new Map<string, number>(); // key is timestamp
+
+function cleanupOldMessages() {
+  const now = Date.now();
+  const maxAge = 10 * 60 * 1000;
+  let cleanedCount = 0;
+
+  for (const [key, timestamp] of processedMessages.entries()) {
+    if (now - timestamp > maxAge) {
+      processedMessages.delete(key);
+      cleanedCount++;
+    }
+  }
+
+  if (cleanedCount > 0) {
+    console.log(`Cleaned up ${cleanedCount} old processed messages`);
+  }
+}
+
+setInterval(cleanupOldMessages, 5 * 60 * 1000);
 
 const kafkaConfig = {
   clientId: `control-pod-${Date.now()}`,
@@ -212,13 +231,36 @@ async function start() {
 
   await consumer.run({
     partitionsConsumedConcurrently: 1,
-    // autoCommit: true,
-    // autoCommitInterval: 15000,
+    autoCommit: false,
     eachMessage: async ({ message, partition, topic }) => {
       console.log(
         `Received message from topic: ${topic}, partition: ${partition}`,
         JSON.stringify(message),
       );
+
+      const messageKey = `${topic}:${partition}:${message.offset}`;
+
+      if (processedMessages.has(messageKey)) {
+        console.log(`Message already processed: ${messageKey}, skipping`);
+        return;
+      }
+
+      processedMessages.set(messageKey, Date.now());
+      console.log(`Processing new message: ${messageKey}`);
+
+      try {
+        await consumer.commitOffsets([
+          {
+            topic,
+            partition,
+            offset: (parseInt(message.offset) + 1).toString(),
+          },
+        ]);
+        console.log(`Committed offset ${parseInt(message.offset) + 1} for ${topic}:${partition}`);
+      } catch (commitError) {
+        console.error(`Failed to commit offset: ${commitError}`);
+      }
+
       const projectId = message.key?.toString();
       const value = message.value?.toString();
 
@@ -312,18 +354,16 @@ async function start() {
             console.log(
               `Processing prompt for project ${projectId}: ${prompt}`,
             );
-            if (promptProcessing.has(projectId)) {
-              console.log(
-                `Project ${projectId} is already processing a prompt, skipping`,
-              );
-              break;
-            }
-            promptProcessing.add(projectId);
+            console.log("Agent processing started for project:", projectId);
+
             try {
-              console.log("Agent processing started for project:", projectId);
               await processPrompt(projectId, prompt, producer);
-            } finally {
-              promptProcessing.delete(projectId);
+              console.log(`Successfully processed prompt for project ${projectId}`);
+            } catch (error) {
+              console.error(
+                `Error processing prompt for project ${projectId}:`,
+                error instanceof Error ? error.message : String(error)
+              );
             }
           } else {
             console.log(
@@ -342,8 +382,8 @@ async function start() {
 
   await consumerControlFromServe.run({
     partitionsConsumedConcurrently: 1,
-    // autoCommit: true,
-    // autoCommitInterval: 15000,
+    autoCommit: true,
+    autoCommitInterval: 1000,
     eachMessage: async ({ message, partition, topic }) => {
       console.log(
         `Received message from topic: ${topic}, partition: ${partition}`,

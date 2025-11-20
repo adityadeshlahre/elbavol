@@ -16,6 +16,9 @@ import { updateFile } from "../tool/dry/updateFile";
 import { replaceInFile } from "../tool/dry/replaceInFile";
 import { writeMultipleFile } from "../tool/dry/writeMultipleFile";
 import { pushFilesToR2 } from "../tool/r2/push";
+import { lineReplace } from "../tool/dry/lineReplace";
+import { grepSearch } from "../tool/dry/grepSearch";
+import { renameFile } from "../tool/dry/renameFile";
 import type { WorkflowState } from "./main";
 import { executeWorkflow } from "./main";
 
@@ -39,6 +42,9 @@ export const allTools = [
   replaceInFile,
   writeMultipleFile,
   pushFilesToR2,
+  lineReplace,
+  grepSearch,
+  renameFile,
 ];
 
 export type { WorkflowState } from "./workflow";

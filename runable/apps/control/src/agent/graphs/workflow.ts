@@ -10,6 +10,7 @@ import { fixErrorsNode } from "../tool/code/intelligentErrorFixer";
 import { pushNode } from "../tool/r2/push";
 import { saveNode } from "../tool/dry/saveContext";
 import { runNode } from "../tool/code/buildSource";
+import { summarizeChangesNode } from "../tool/dry/summarizeChanges";
 import { allTools } from "./main";
 
 export interface WorkflowState {
@@ -35,6 +36,16 @@ export interface WorkflowState {
     toolsExecuted?: boolean;
     fixesApplied?: boolean;
     noFixesAvailable?: boolean;
+    changeSummary?: {
+        filesCreated: string[];
+        filesModified: string[];
+        filesDeleted: string[];
+        commandsExecuted: string[];
+        dependenciesAdded: string[];
+        dependenciesRemoved: string[];
+        buildStatus: string;
+        summary: string;
+    };
 }
 
 async function executeNode(state: WorkflowState): Promise<Partial<WorkflowState>> {
@@ -195,6 +206,10 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
 
                     const runResult = await runNode(state);
                     state = { ...state, ...runResult };
+
+                    const summaryResult = await summarizeChangesNode(state);
+                    state = { ...state, ...summaryResult };
+
                     break;
                 }
                 const fixResult = await fixErrorsNode(state);
@@ -223,6 +238,11 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
             state.error = "Workflow ended without completion or error";
         }
 
+        if (state.toolResults && state.toolResults.length > 0) {
+            const summaryResult = await summarizeChangesNode(state);
+            state = { ...state, ...summaryResult };
+        }
+
         return state;
     } catch (error) {
         console.error("Workflow execution error:", error);
@@ -235,6 +255,12 @@ export async function executeWorkflow(initialState: WorkflowState): Promise<Work
 
         state.error = errorMessage;
         state.completed = false;
+
+        if (state.toolResults && state.toolResults.length > 0) {
+            const summaryResult = await summarizeChangesNode(state);
+            state = { ...state, ...summaryResult };
+        }
+
         return state;
     }
 }
