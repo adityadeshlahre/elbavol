@@ -111,6 +111,23 @@ export const getContext = tool(
       context.baseTemplate = { ...previousContext.baseTemplate };
     }
 
+    if (previousContext?.lastExecution?.summary) {
+      return {
+        context: {
+          projectId,
+          projectPath: projectDir,
+          metadata: previousContext.metadata,
+          lastExecution: previousContext.lastExecution,
+          currentFiles: {},
+          baseTemplate: previousContext.baseTemplate,
+          dependencies: previousContext.dependencies,
+          devDependencies: previousContext.devDependencies,
+          scripts: previousContext.scripts,
+          fileStructure: previousContext.fileStructure
+        }
+      };
+    }
+
     try {
       if (fs.existsSync(projectDir)) {
         context.baseTemplate.exists = true;

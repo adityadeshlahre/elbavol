@@ -1,4 +1,5 @@
-import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
+// NOTE: MESSAGE_KEYS and TOPIC imports removed as producer.send calls are now commented out
+// import { MESSAGE_KEYS, TOPIC } from "@elbavol/constants";
 import fs from "fs";
 import type { Producer } from "kafkajs";
 import { tool } from "langchain";
@@ -17,35 +18,39 @@ export const buildProjectAndNotifyToRun = async (
   const dir = path.join(sharedDir, projectId);
 
   if (!fs.existsSync(dir)) {
-    await producer.send({
-      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-      messages: [
-        {
-          value: JSON.stringify({
-            key: MESSAGE_KEYS.PROJECT_FAILED,
-            projectId,
-            error: "Project directory not found",
-          }),
-        },
-      ],
-    });
+    console.error(`Project directory not found: ${dir}`);
+    // COMMENTED OUT: Orchestrator doesn't need build progress updates
+    // await producer.send({
+    //   topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+    //   messages: [
+    //     {
+    //       value: JSON.stringify({
+    //         key: MESSAGE_KEYS.PROJECT_FAILED,
+    //         projectId,
+    //         error: "Project directory not found",
+    //       }),
+    //     },
+    //   ],
+    // });
     return false;
   }
 
   const packageJsonPath = path.join(dir, "package.json");
   if (!fs.existsSync(packageJsonPath)) {
-    await producer.send({
-      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-      messages: [
-        {
-          value: JSON.stringify({
-            key: MESSAGE_KEYS.PROJECT_FAILED,
-            projectId,
-            error: "package.json not found",
-          }),
-        },
-      ],
-    });
+    console.error(`package.json not found: ${packageJsonPath}`);
+    // COMMENTED OUT: Orchestrator doesn't need build progress updates
+    // await producer.send({
+    //   topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+    //   messages: [
+    //     {
+    //       value: JSON.stringify({
+    //         key: MESSAGE_KEYS.PROJECT_FAILED,
+    //         projectId,
+    //         error: "package.json not found",
+    //       }),
+    //     },
+    //   ],
+    // });
     return false;
   }
 
@@ -63,18 +68,20 @@ export const buildProjectAndNotifyToRun = async (
     });
 
     if (installCode !== 0) {
-      await producer.send({
-        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-        messages: [
-          {
-            value: JSON.stringify({
-              key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
-              projectId,
-              error: `Failed to install dependencies: ${installStderr}`,
-            }),
-          },
-        ],
-      });
+      console.error(`Failed to install dependencies: ${installStderr}`);
+      // COMMENTED OUT: Orchestrator doesn't need build progress updates
+      // await producer.send({
+      //   topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+      //   messages: [
+      //     {
+      //       value: JSON.stringify({
+      //         key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
+      //         projectId,
+      //         error: `Failed to install dependencies: ${installStderr}`,
+      //       }),
+      //     },
+      //   ],
+      // });
       return false;
     }
 
@@ -90,33 +97,38 @@ export const buildProjectAndNotifyToRun = async (
     });
 
     if (buildCode !== 0) {
-      await producer.send({
-        topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-        messages: [
-          {
-            value: JSON.stringify({
-              key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
-              projectId,
-              error: `Failed to build project: ${buildStderr}`,
-            }),
-          },
-        ],
-      });
+      console.error(`Failed to build project: ${buildStderr}`);
+      // COMMENTED OUT: Orchestrator doesn't need build progress updates
+      // await producer.send({
+      //   topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+      //   messages: [
+      //     {
+      //       value: JSON.stringify({
+      //         key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
+      //         projectId,
+      //         error: `Failed to build project: ${buildStderr}`,
+      //       }),
+      //     },
+      //   ],
+      // });
       return false;
     }
 
-    await producer.send({
-      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-      messages: [
-        {
-          value: JSON.stringify({
-            key: MESSAGE_KEYS.PROJECT_BUILD_SUCCESS,
-            projectId,
-          }),
-        },
-      ],
-    });
+    console.log(`Project ${projectId} build completed successfully`);
+    // COMMENTED OUT: Orchestrator doesn't need build success notification
+    // await producer.send({
+    //   topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+    //   messages: [
+    //     {
+    //       value: JSON.stringify({
+    //         key: MESSAGE_KEYS.PROJECT_BUILD_SUCCESS,
+    //         projectId,
+    //       }),
+    //     },
+    //   ],
+    // });
 
+    // Already commented out - good!
     // await producer.send({
     //   topic: TOPIC.CONTROL_TO_SERVING,
     //   messages: [
@@ -132,18 +144,20 @@ export const buildProjectAndNotifyToRun = async (
 
     return true;
   } catch (error) {
-    await producer.send({
-      topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
-      messages: [
-        {
-          value: JSON.stringify({
-            key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
-            projectId,
-            error: `Build error: ${error instanceof Error ? error.message : String(error)}`,
-          }),
-        },
-      ],
-    });
+    console.error(`Build error: ${error instanceof Error ? error.message : String(error)}`);
+    // COMMENTED OUT: Orchestrator doesn't need build error notifications
+    // await producer.send({
+    //   topic: TOPIC.CONTROL_TO_ORCHESTRATOR,
+    //   messages: [
+    //     {
+    //       value: JSON.stringify({
+    //         key: MESSAGE_KEYS.PROJECT_BUILD_FAILED,
+    //         projectId,
+    //         error: `Build error: ${error instanceof Error ? error.message : String(error)}`,
+    //       }),
+    //     },
+    //   ],
+    // });
     return false;
   }
 };

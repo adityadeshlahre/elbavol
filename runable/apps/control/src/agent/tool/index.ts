@@ -15,3 +15,6 @@ export { testBuild } from "./dry/testBuild";
 export { updateFile } from "./dry/updateFile";
 export { writeMultipleFile } from "./dry/writeMultipleFile";
 export { pushFilesToR2 } from "./r2/push";
+export { lineReplace } from "./dry/lineReplace";
+export { grepSearch } from "./dry/grepSearch";
+export { renameFile } from "./dry/renameFile";

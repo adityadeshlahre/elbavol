@@ -25,15 +25,15 @@ CRITICAL CONTEXT - READ THIS FIRST:
 - You MUST work on top of the EXISTING base template
 
 BASE TEMPLATE INCLUDES:
-✅ React 19 with JavaScript - ALREADY INSTALLED
-✅ Bun runtime and package manager - ALREADY CONFIGURED
-✅ Tailwind CSS v4 (latest) - ALREADY INSTALLED AND CONFIGURED
-✅ shadcn/ui components - Button, Card, Input, Label, Textarea - ALREADY AVAILABLE
-✅ Lucide React icons - ALREADY INSTALLED
-✅ For new shadcn components: Use \`bunx --bun shadcn@latest add <component-name>\` from https://ui.shadcn.com/docs/components
-✅ Hot reload with bun --hot - ALREADY RUNNING
-✅ Build system with build.js - ALREADY CONFIGURED
-✅ Utility functions: cn() in @/lib/utils - ALREADY AVAILABLE
+React 19 with JavaScript - ALREADY INSTALLED
+Bun runtime and package manager - ALREADY CONFIGURED
+Tailwind CSS v4 (latest) - ALREADY INSTALLED AND CONFIGURED
+shadcn/ui components - Button, Card, Input, Label, Textarea - ALREADY AVAILABLE
+Lucide React icons - ALREADY INSTALLED
+For new shadcn components: Use \`bunx --bun shadcn@latest add <component-name> -y\` from https://ui.shadcn.com/docs/components
+Hot reload with bun --hot - ALREADY RUNNING
+Build system with build.js - ALREADY CONFIGURED
+Utility functions: cn() in @/lib/utils - ALREADY AVAILABLE
 
 EXISTING FILE STRUCTURE:
 - package.json (with all dependencies)
@@ -83,36 +83,54 @@ Return a JSON object with this exact structure:
 }
 
 Available tools and their arguments:
-- listDir: { directory: string } - List existing directory structure
-- readFile: { filePath: string } - Read existing file content
-- updateFile: { filePath: string, content: string } - Modify existing file
+
+**File Operations:**
+- listDir: { directory?: string, globPattern?: string } - List directory with optional filtering
+- readFile: { filePath: string, startLine?: number, endLine?: number } - Read file with optional line ranges
+- lineReplace: { filePath: string, search: string, firstReplacedLine: number, lastReplacedLine: number, replace: string } - PREFERRED for editing (supports ellipsis)
+- updateFile: { filePath: string, content: string } - Modify entire file (use sparingly)
 - createFile: { filePath: string, content: string } - Create NEW file only
+- writeMultipleFile: { files: [{ path: string, data: string }] } - Create/update multiple files at once
 - deleteFile: { filePath: string } - Delete a file
+- renameFile: { oldPath: string, newPath: string } - Rename/move file
+- replaceInFile: { filePath: string, oldString: string, newString: string } - Simple string replacement
+
+**Code Search:**
+- grepSearch: { pattern: string, globPattern?: string, searchPath?: string } - Search code with regex patterns
+
+**Command Execution:**
 - executeCommand: { command: string, cwd?: string } - Run shell commands
+
+**Dependencies:**
 - addDependency: { packages: string[], cwd?: string } - Add NEW packages only
 - removeDependency: { packages: string[], cwd?: string } - Remove packages
 - checkMissingPackage: { packages: string[], cwd?: string } - Check if package exists
-- writeMultipleFile: { files: [{ path: string, data: string }] } - Create/update multiple files
+
+**Context Management:**
 - getContext: { projectId: string } - Get project context
 - saveContext: { context: object, filePath?: string } - Save context
+
+**Build & Validation:**
 - testBuild: { action: "build" | "test", cwd?: string } - Test the build
 - validateBuild: { projectId: string, userInstructions: string } - Validate build
+
+**Storage:**
 - pushFilesToR2: { projectId: string, bucketName: string } - Push to storage
 
 MANDATORY FIRST STEPS IN EVERY PLAN:
 1. listDir({ directory: "." }) - See what exists
-2. listDir({ directory: "src/components/ui" }) - Check available UI components
-3. listDir({ directory: "src/components/" }) - Check available components
-4. readFile({ filePath: "package.json" }) - Check dependencies
-5. readFile({ filePath: "src/App.jsx" }) - Understand current app
+2. readFile({ filePath: "package.json" }) - Check dependencies
+3. readFile({ filePath: "src/App.jsx" }) - Understand current app
+4. grepSearch (if needed) - Search for patterns to understand codebase
 
-Then modify/add files based on what you found.
+Then modify/add files based on what you found. PREFER lineReplace over updateFile.
 
 BEAUTIFUL UI DESIGN REQUIREMENTS:
-- Use Tailwind CSS for stunning visuals: gradients (bg-gradient-to-r from-blue-500 to-purple-600), shadows (shadow-2xl), animations (animate-pulse), hover effects (hover:scale-105)
+- Use Tailwind CSS for stunning visuals but with DESIGN SYSTEM TOKENS (no hardcoded colors like text-white, bg-black)
+- Use gradients (bg-gradient-to-r), shadows (shadow-2xl), animations (animate-pulse), hover effects (hover:scale-105)
 - Prefer existing shadcn/ui components (Button, Card, Input, Label, Textarea) over custom ones
 - Add Lucide icons for better UX
-- Create responsive, modern designs with proper spacing and colors
+- Create responsive, modern designs with proper spacing
 - For new components: \`bunx --bun shadcn@latest add <component-name>\` if needed from https://ui.shadcn.com/docs/components
 
 CRITICAL: Return ONLY valid JSON. Do NOT wrap in markdown code blocks or backticks. Just the raw JSON object.`;
