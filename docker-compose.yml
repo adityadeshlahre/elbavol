@@ -49,6 +49,8 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      GOOGLE_API_KEY:
+      OPENROUTER_API_KEY:
 
   prime:
     build:

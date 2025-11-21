@@ -1,3 +1,36 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orchestrator
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: orchestrator-role
+  namespace: default
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "create", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: orchestrator-rolebinding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: orchestrator
+    namespace: default
+roleRef:
+  kind: Role
+  name: orchestrator-role
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,25 +46,40 @@ spec:
       labels:
         app: orchestrator
     spec:
+      serviceAccountName: orchestrator
       containers:
         - name: orchestrator
-          image: gcr.io/elegant-zodiac-470908-i0/orchestrator:latest
+          image: aivalacoder/elbavol-orchestrator:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
             - name: KAFKA_URL
-              value: "kafka:9092"
+              value: "kafka.default.svc.cluster.local:9092"
+            - name: DOCKER_USER_NAME
+              value: "aivalacoder"
             - name: GOOGLE_API_KEY
-              value: ""
+              valueFrom:
+                secretKeyRef:
+                  name: api-keys
+                  key: googleApiKey
             - name: OPENROUTER_API_KEY
-              value: ""
+              valueFrom:
+                secretKeyRef:
+                  name: api-keys
+                  key: openrouterApiKey
             - name: MINIO_ENDPOINT
-              value: "http://minio:9000"
+              value: "http://minio.default.svc.cluster.local:9000"
             - name: MINIO_ACCESS_KEY
-              value: "MINIO_ROOT_USER"
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: accessKey
             - name: MINIO_SECRET_KEY
-              value: "MINIO_ROOT_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: secretKey
 ---
 apiVersion: v1
 kind: Service

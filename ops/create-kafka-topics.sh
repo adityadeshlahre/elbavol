@@ -5,7 +5,7 @@
 # Run this after Kafka is deployed and running
 
 KAFKA_POD="kafka-0"
-BOOTSTRAP_SERVER="kafka-svc.default.svc.cluster.local:9092"
+BOOTSTRAP_SERVER="kafka.default.svc.cluster.local:9092"
 
 # List of topics to create
 TOPICS=(
