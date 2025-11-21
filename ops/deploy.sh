@@ -4,6 +4,9 @@ set -e
 
 echo "Starting deployment of Elbavol services..."
 
+echo "Deploying Secrets..."
+kubectl apply -f secrets.yaml
+
 echo "Deploying Zookeeper..."
 kubectl apply -f zookeeper.yaml
 

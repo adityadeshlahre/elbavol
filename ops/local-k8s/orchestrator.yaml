@@ -59,15 +59,27 @@ spec:
              - name: DOCKER_USER_NAME
                value: "aivalacoder"
              - name: GOOGLE_API_KEY
-               value: ""
+               valueFrom:
+                 secretKeyRef:
+                   name: api-keys
+                   key: googleApiKey
              - name: OPENROUTER_API_KEY
-               value: ""
+               valueFrom:
+                 secretKeyRef:
+                   name: api-keys
+                   key: openrouterApiKey
              - name: MINIO_ENDPOINT
                value: "http://minio.default.svc.cluster.local:9000" # docker : "http://host.docker.internal:9000" 
              - name: MINIO_ACCESS_KEY
-               value: "minioadmin"
+               valueFrom:
+                 secretKeyRef:
+                   name: minio-credentials
+                   key: accessKey
              - name: MINIO_SECRET_KEY
-               value: "minioadmin"
+               valueFrom:
+                 secretKeyRef:
+                   name: minio-credentials
+                   key: secretKey
 ---
 apiVersion: v1
 kind: Service
