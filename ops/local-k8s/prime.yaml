@@ -21,7 +21,7 @@ spec:
              - containerPort: 8080
            env:
              - name: KAFKA_URL
-               value: "host.docker.internal:9092"
+               value: "kafka.default.svc.cluster.local:9092" # docker : host.docker.internal:9092
 ---
 apiVersion: v1
 kind: Service
