@@ -71,3 +71,21 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-serve:latest
+
+      - name: Build and Push Uploader Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./runable/apps/uploader/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-uploader:latest
+
+      - name: Build and Push SSE Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./runable/apps/sse/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/elbavol-sse:latest

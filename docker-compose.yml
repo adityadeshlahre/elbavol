@@ -21,6 +21,28 @@ services:
     environment:
       KAFKAJS_NO_PARTITIONER_WARNING: 1
 
+  uploader:
+    build:
+      context: .
+      dockerfile: ./runable/apps/uploader/Dockerfile
+      platforms:
+        - linux/amd64
+    image: elbavol-uploader:latest
+    container_name: elbavol-uploader
+    environment:
+      KAFKAJS_NO_PARTITIONER_WARNING: 1
+
+  sse:
+    build:
+      context: .
+      dockerfile: ./runable/apps/sse/Dockerfile
+      platforms:
+        - linux/amd64
+    image: elbavol-sse:latest
+    container_name: elbavol-sse
+    environment:
+      KAFKAJS_NO_PARTITIONER_WARNING: 1
+
   ingress:
     build:
       context: .
@@ -51,6 +73,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       GOOGLE_API_KEY:
       OPENROUTER_API_KEY:
+
 
   prime:
     build:

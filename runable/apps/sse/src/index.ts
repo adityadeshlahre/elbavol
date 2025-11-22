@@ -104,10 +104,12 @@ function sendSSEMessage(clientId: string, data: any): boolean {
   }
 }
 
-const kafka = new Kafka({
+const kafkaConfig = {
   clientId: `sse-pod-${Date.now()}`,
   brokers: (process.env.KAFKA_URL || "localhost:9092").split(","),
-});
+};
+
+const kafka = new Kafka(kafkaConfig);
 
 const consumer = kafka.consumer({
   groupId: GROUP_ID.SSE_POD,
