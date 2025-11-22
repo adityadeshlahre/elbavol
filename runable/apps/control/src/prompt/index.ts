@@ -101,7 +101,10 @@ CRITICAL IMPORT/EXPORT VALIDATION:
 - Create component variants for different states using the design system
 
 ### Beautiful UI Requirements:
-- Use gradients: bg-gradient-to-r from-{random-color}-500 to-{random-color}-600
+- Use gradients: bg-gradient-to-r from-[color]-{shade} to-[color]-{shade}
+  - Where [color] can be one of: red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose.
+  - And {shade} is a random value from 100 to 900 (e.g., 200, 700). Ensure the 'to' shade is generally darker than the 'from' shade for a smooth transition.
+  - Do not use blue and purple gradients in entire project
 - Add shadows: shadow-2xl, shadow-glow
 - Include animations: animate-pulse, hover:scale-105, transition-smooth
 - Use hover effects for interactive elements
