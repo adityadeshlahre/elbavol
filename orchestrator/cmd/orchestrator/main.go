@@ -153,27 +153,47 @@ func main() {
 
 			switch response {
 			case sharedTypes.PROMPT_RESPONSE:
-				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROMPT_RESPONSE+"|"+payload))
+				err := KafkaSenderClientToBackend.WriteMessage(
+					[]byte(responseId),
+					[]byte(sharedTypes.PROMPT_RESPONSE+"|"+payload),
+				)
 				if err != nil {
 					log.Printf("Failed to send PROMPT_RESPONSE message to backend for project %s: %v", responseId, err)
 				}
 
 			case sharedTypes.PROJECT_FAILED:
-				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROJECT_FAILED)) // project failed has smoe extra things to send
+				err := KafkaSenderClientToBackend.WriteMessage(
+					[]byte(responseId),
+					[]byte(sharedTypes.PROJECT_FAILED),
+				) // project failed has smoe extra things to send
 				if err != nil {
 					log.Printf("Failed to send PROJECT_FAILED message to backend for project %s: %v", responseId, err)
 				}
 
 			case sharedTypes.PROJECT_BUILD_SUCCESS:
-				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROJECT_BUILD_SUCCESS))
+				err := KafkaSenderClientToBackend.WriteMessage(
+					[]byte(responseId),
+					[]byte(sharedTypes.PROJECT_BUILD_SUCCESS),
+				)
 				if err != nil {
-					log.Printf("Failed to send PROJECT_BUILD_SUCCESS message to backend for project %s: %v", responseId, err)
+					log.Printf(
+						"Failed to send PROJECT_BUILD_SUCCESS message to backend for project %s: %v",
+						responseId,
+						err,
+					)
 				}
 
 			case sharedTypes.PROJECT_BUILD_FAILED:
-				err := KafkaSenderClientToBackend.WriteMessage([]byte(responseId), []byte(sharedTypes.PROJECT_BUILD_FAILED))
+				err := KafkaSenderClientToBackend.WriteMessage(
+					[]byte(responseId),
+					[]byte(sharedTypes.PROJECT_BUILD_FAILED),
+				)
 				if err != nil {
-					log.Printf("Failed to send PROJECT_BUILD_FAILED message to backend for project %s: %v", responseId, err)
+					log.Printf(
+						"Failed to send PROJECT_BUILD_FAILED message to backend for project %s: %v",
+						responseId,
+						err,
+					)
 				}
 
 			default:

@@ -51,11 +51,11 @@ func CreateNodeDevelopmentDeployment(
 					},
 					Containers: []corev1.Container{
 						{
-							Name: "controller",
-							// Image:           "aivalacoder/elbavol-control:latest",
-							// ImagePullPolicy: corev1.PullAlways,
-							Image:           "elbavol-control:latest",
-							ImagePullPolicy: corev1.PullNever,
+							Name:            "controller",
+							Image:           "aivalacoder/elbavol-control:latest",
+							ImagePullPolicy: corev1.PullAlways,
+							// Image:           "elbavol-control:latest",
+							// ImagePullPolicy: corev1.PullNever,
 							Env: []corev1.EnvVar{
 								{
 									Name:  "PROJECT_ID",
@@ -65,7 +65,8 @@ func CreateNodeDevelopmentDeployment(
 									Name: "BUCKET_NAME", Value: "elbavol",
 								},
 								{
-									Name: "KAFKA_URL", Value: "host.docker.internal:9092",
+									Name:  "KAFKA_URL",
+									Value: os.Getenv("KAFKA_URL"),
 								},
 								{
 									Name: "SHARED_DIR", Value: "/app/shared",
@@ -100,11 +101,11 @@ func CreateNodeDevelopmentDeployment(
 						},
 
 						{
-							Name: "serving",
-							// Image:           "aivalacoder/elbavol-serve:latest",
-							// ImagePullPolicy: corev1.PullAlways,
-							Image:           "elbavol-serve:latest",
-							ImagePullPolicy: corev1.PullNever,
+							Name:            "serving",
+							Image:           "aivalacoder/elbavol-serve:latest",
+							ImagePullPolicy: corev1.PullAlways,
+							// Image:           "elbavol-serve:latest",
+							// ImagePullPolicy: corev1.PullNever,
 							Env: []corev1.EnvVar{
 								{
 									Name:  "PROJECT_ID",
@@ -114,7 +115,8 @@ func CreateNodeDevelopmentDeployment(
 									Name: "BUCKET_NAME", Value: "elbavol",
 								},
 								{
-									Name: "KAFKA_URL", Value: "host.docker.internal:9092",
+									Name:  "KAFKA_URL",
+									Value: os.Getenv("KAFKA_URL"),
 								},
 								{
 									Name: "SHARED_DIR", Value: "/app/shared",
